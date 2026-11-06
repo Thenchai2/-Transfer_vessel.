@@ -302,8 +302,8 @@
       </div>
       <div class="p-3">
         <div class="row g-3" id="latest-cards-container">
-          <div class="col-12 text-center py-4 text-muted">
-            <div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังเชื่อมต่อข้อมูลสถานีตาชั่ง...
+          <div class="col-12 text-center py-4 text-light">
+            <div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังซิงค์ข้อมูลสถานีตาชั่ง (Station Mimic)...
           </div>
         </div>
       </div>
@@ -445,7 +445,7 @@
           </thead>
           <tbody>
             <tr>
-              <td colspan="8" class="text-center py-4 text-light">กำลังโหลดข้อมูลจาก Google Sheets...</td>
+              <td colspan="8" class="text-center py-4 text-light">กำลังซิงค์ข้อมูลระบบ (Synchronizing System Data)...</td>
             </tr>
           </tbody>
         </table>
@@ -498,14 +498,14 @@
       setInterval(update, 1000);
     }
 
-    // ฟังก์ชันดึงข้อมูลจาก Google Apps Script
+    // ฟังก์ชันดึงข้อมูลจาก API ระบบ
     function loadData() {
       document.getElementById('comm-status').innerText = 'SYNCING...';
       document.getElementById('comm-status').className = 'text-warning';
 
-      document.querySelector('#detail-table tbody').innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary me-2"></div>กำลังเชื่อมต่อข้อมูลจาก Google Apps Script...</td></tr>';
-      document.querySelector('#summary-table tbody').innerHTML = '<tr><td colspan="7" class="text-center py-3 text-muted">กำลังโหลดข้อมูล...</td></tr>';
-      document.getElementById('latest-cards-container').innerHTML = '<div class="col-12 text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังอัปเดตสถานีตาชั่ง...</div>';
+      document.querySelector('#detail-table tbody').innerHTML = '<tr><td colspan="8" class="text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div>กำลังซิงค์ข้อมูลระบบ (Synchronizing System Data)...</td></tr>';
+      document.querySelector('#summary-table tbody').innerHTML = '<tr><td colspan="7" class="text-center py-3 text-light">กำลังประมวลผลสรุปยอดการใช้งาน...</td></tr>';
+      document.getElementById('latest-cards-container').innerHTML = '<div class="col-12 text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังซิงค์สถานะสถานีตาชั่ง (Station Mimic)...</div>';
 
       var url = getWebAppUrl();
 
@@ -584,7 +584,7 @@
       document.querySelector('#detail-table tbody').innerHTML = 
         '<tr><td colspan="9" class="text-center py-4 text-danger">' +
         'เกิดข้อผิดพลาดในการดึงข้อมูล: ' + msg + '<br>' +
-        '<small class="text-muted">กรุณาตรวจสอบว่า Deploy Apps Script เป็น "Who has access: Anyone" แล้ว</small>' +
+        '<small class="text-light">กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตหรือสถานะเซิร์ฟเวอร์ระบบ</small>' +
         '</td></tr>';
       document.getElementById('latest-cards-container').innerHTML = '<div class="col-12 text-center py-3 text-danger">ไม่สามารถโหลดข้อมูลได้</div>';
     }
