@@ -1,0 +1,1187 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PP CHEMICAL DOSING SYSTEM</title>
+  <link rel="icon" type="image/png" href="https://lh3.googleusercontent.com/d/1kH8HErbms_U0xnoiJ7jlW7r79FK3hXeB">
+  <!-- โหลด Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <!-- โหลด Chart.js สำหรับทำกราฟ SCADA -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    /* ใช้ฟอนต์เดิมที่อ่านง่าย คมชัด มาตรฐานระบบ (Segoe UI / Tahoma) ไม่ใช้ฟอนต์แปลกตา */
+    body {
+      background-color: #0f172a;
+      color: #f1f5f9;
+      font-family: 'Segoe UI', Tahoma, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 14.5px;
+      padding-bottom: 30px;
+    }
+
+    /* SCADA Top Header */
+    .scada-navbar {
+      background-color: #1e293b;
+      border-bottom: 2px solid #3b82f6;
+      padding: 12px 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .scada-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: 0.5px;
+    }
+
+    /* กล่องแผงควบคุมสไตล์ SCADA Control Room */
+    .scada-panel {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .scada-panel-header {
+      background-color: #273549;
+      border-bottom: 1px solid #334155;
+      padding: 10px 16px;
+      font-weight: 600;
+      color: #93c5fd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top-left-radius: 8px;
+      border-top-right-radius: 8px;
+    }
+
+    /* การ์ดสถานีตาชั่ง (Station Mimic Card) */
+    .station-mimic-card {
+      background-color: #162032;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 14px;
+      height: 100%;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .station-mimic-card:hover {
+      border-color: #60a5fa;
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+    }
+
+    /* กล่องหน้าปัดแสดงค่าน้ำหนัก Target และ Actual */
+    .readout-box {
+      border-radius: 6px;
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .readout-target {
+      background-color: #1e293b;
+      border: 1px solid #475569;
+    }
+    .readout-actual {
+      background-color: #0c2d48;
+      border: 1px solid #2563eb;
+    }
+    .readout-label {
+      font-size: 0.78rem;
+      color: #94a3b8;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .readout-value {
+      font-size: 1.35rem;
+      font-weight: 700;
+      line-height: 1.2;
+    }
+
+    /* ไฟ LED แสดงสถานะ */
+    .status-led {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      margin-right: 6px;
+    }
+    .status-led.idle {
+      background-color: #94a3b8;
+      box-shadow: none;
+    }
+
+    /* หลอดเกจความคืบหน้า SCADA Bar */
+    .scada-progress {
+      height: 7px;
+      background-color: #0f172a;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 8px;
+      border: 1px solid #334155;
+    }
+    .scada-progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #10b981);
+      transition: width 0.4s ease;
+    }
+
+    /* กล่องตัวกรองวันที่ */
+    .filter-card {
+      background-color: #162032;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+    }
+
+    .form-control, .form-select {
+      background-color: #0f172a;
+      border: 1px solid #475569;
+      color: #ffffff;
+      font-size: 14px;
+    }
+    .form-control:focus, .form-select:focus {
+      background-color: #1e293b;
+      color: #ffffff;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25);
+    }
+
+    /* ตาราง SCADA */
+    .table-scada {
+      color: #e2e8f0;
+      margin-bottom: 0;
+      font-size: 14px;
+    }
+    .table-scada thead th {
+      background-color: #1a2536;
+      color: #93c5fd;
+      border-bottom: 2px solid #334155;
+      border-top: none;
+      padding: 10px;
+      text-align: center;
+      vertical-align: middle;
+      font-weight: 600;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    .table-scada tbody td {
+      border-color: #273549;
+      padding: 8px 10px;
+      vertical-align: middle;
+      background-color: transparent;
+    }
+    .table-scada tbody tr:hover {
+      background-color: rgba(59, 130, 246, 0.08);
+    }
+    .table-container {
+      max-height: 420px;
+      overflow-y: auto;
+    }
+
+    .text-num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Quick Buttons */
+    .btn-quick-date {
+      font-size: 0.8rem;
+      padding: 3px 8px;
+      color: #94a3b8;
+      border-color: #475569;
+    }
+    .btn-quick-date:hover {
+      background-color: #334155;
+      color: #ffffff;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 1. แถบหัว SCADA Navbar -->
+  <div class="scada-navbar">
+    <div class="container-fluid px-2">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-3">
+          <img src="https://lh3.googleusercontent.com/d/1kH8HErbms_U0xnoiJ7jlW7r79FK3hXeB" alt="PP Logo" class="rounded shadow-sm" style="height: 46px; max-width: 120px; object-fit: contain; background: #ffffff; padding: 3px;">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <span class="scada-title">PP CHEMICAL DOSING SYSTEM</span>
+              <span class="badge bg-primary-subtle text-primary border border-primary-subtle">LINE-1</span>
+            </div>
+            <div class="small text-muted">ระบบติดตามน้ำหนักและการใช้งานเคมีอัตโนมัติ</div>
+          </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="px-3 py-1 rounded bg-dark border border-secondary text-success small fw-bold d-flex align-items-center">
+            <span class="status-led"></span> <span id="comm-status">ONLINE</span>
+          </div>
+          <div class="px-3 py-1 rounded bg-dark border border-secondary text-info small" id="live-clock">
+            00:00:00
+          </div>
+          <button class="btn btn-sm btn-primary fw-semibold" onclick="loadData()">
+            <i class="bi bi-arrow-repeat me-1"></i> รีเฟรชข้อมูล
+          </button>
+          <button class="btn btn-sm btn-outline-light" data-bs-toggle="modal" data-bs-target="#configModal" title="ตั้งค่า Web App URL">
+            <i class="bi bi-gear me-1"></i> ตั้งค่า URL
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container-fluid px-3">
+
+    <!-- 2. ส่วนการ์ดสถานีตาชั่ง สไตล์ SCADA Mimic (การใช้งานล่าสุดของแต่ละตาชั่ง) -->
+    <div class="scada-panel">
+      <div class="scada-panel-header">
+        <span><i class="bi bi-hdd-network text-info me-2"></i>STATION MIMIC PANELS (สถานะการใช้งานล่าสุดของแต่ละตาชั่ง)</span>
+        <span class="badge bg-dark border border-secondary text-muted" id="last-update-time">รอโหลดข้อมูล...</span>
+      </div>
+      <div class="p-3">
+        <div class="row g-3" id="latest-cards-container">
+          <div class="col-12 text-center py-4 text-muted">
+            <div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังเชื่อมต่อข้อมูลสถานีตาชั่ง...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. ส่วนตัวกรองช่วงเวลา (วันที่เริ่มต้น - วันที่สิ้นสุด) -->
+    <div class="filter-card">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2 pb-2 border-bottom border-secondary">
+        <span class="fw-bold text-info"><i class="bi bi-funnel-fill me-1"></i> ตัวกรองรายงานช่วงเวลา</span>
+        <div class="d-flex gap-1 flex-wrap">
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-date" onclick="setQuickDate('today')">วันนี้</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-date" onclick="setQuickDate('yesterday')">เมื่อวาน</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-date" onclick="setQuickDate('7days')">7 วันล่าสุด</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-date" onclick="setQuickDate('30days')">30 วัน</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-date" onclick="setQuickDate('all')">ทั้งหมด</button>
+        </div>
+      </div>
+      <div class="row g-2 align-items-end">
+        <div class="col-md-2">
+          <label class="form-label text-muted small mb-1">วันที่เริ่มต้น (Start Date)</label>
+          <input type="date" class="form-control form-control-sm" id="start-date" onchange="filterData()">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label text-muted small mb-1">วันที่สิ้นสุด (End Date)</label>
+          <input type="date" class="form-control form-control-sm" id="end-date" onchange="filterData()">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label text-muted small mb-1">เลือกสารเคมี (Chemical)</label>
+          <select class="form-select form-select-sm" id="chemical-filter" onchange="filterData()">
+            <option value="ALL">-- ทุกสารเคมี (แสดงรวม) --</option>
+            <option value="CAUSTIC SODA 50%">CAUSTIC SODA 50%</option>
+            <option value="LS9">LS9</option>
+            <option value="UD1">UD1</option>
+            <option value="LAS">LAS</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label text-muted small mb-1">เลือกโหมด (Mode)</label>
+          <select class="form-select form-select-sm" id="mode-filter" onchange="filterData()">
+            <option value="ALL">-- ทุกโหมด (สรุปรวมเคมี) --</option>
+            <option value="Mode Weight">Mode Weight</option>
+            <option value="Mode Timer">Mode Timer</option>
+          </select>
+        </div>
+        <div class="col-md-3 d-flex gap-2">
+          <button class="btn btn-sm btn-success w-100 fw-bold" onclick="filterData()">
+            <i class="bi bi-search me-1"></i> สรุปข้อมูล
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="clearFilter()" title="ล้างค่าตัวกรอง">
+            <i class="bi bi-arrow-counterclockwise"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. ส่วนกราฟ SCADA (Bar Chart ยอดการใช้เคมีรวม + Line Chart Trend Target vs Actual) -->
+    <div class="row g-3 mb-3">
+      <!-- กราฟที่ 1: กราฟแท่ง ปริมาณการใช้เคมีจริง -->
+      <div class="col-lg-6">
+        <div class="scada-panel h-100 mb-0">
+          <div class="scada-panel-header">
+            <span><i class="bi bi-bar-chart-fill text-info me-2"></i><span id="barchart-title">ปริมาณสารเคมีที่ใช้งานจริงรวม (Total Chemical Used kg)</span></span>
+          </div>
+          <div class="p-3">
+            <div style="position: relative; height: 260px;">
+              <canvas id="barChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- กราฟที่ 2: กราฟเส้น Process Trend Target vs Actual -->
+      <div class="col-lg-6">
+        <div class="scada-panel h-100 mb-0">
+          <div class="scada-panel-header">
+            <span><i class="bi bi-graph-up text-info me-2"></i>PROCESS TREND RECORDER (เปรียบเทียบ Target vs Actual)</span>
+          </div>
+          <div class="p-3">
+            <div style="position: relative; height: 260px;">
+              <canvas id="trendChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. ตารางสรุปปริมาณการใช้งานเคมี -->
+    <div class="scada-panel">
+      <div class="scada-panel-header">
+        <span><i class="bi bi-calculator text-info me-2"></i><span id="summary-panel-title">สรุปปริมาณการใช้งานเคมี (Chemical Usage Summary)</span></span>
+        <span class="small text-muted" id="filter-status">ช่วงเวลา: ข้อมูลทั้งหมด</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-scada table-hover align-middle mb-0" id="summary-table">
+          <thead>
+            <tr>
+              <th style="width: 50px;">ลำดับ</th>
+              <th class="text-start ps-3" id="summary-col-name">ชื่อสารเคมี (Chemical Name)</th>
+              <th style="width: 130px;">จำนวนรอบ (ครั้ง)</th>
+              <th style="width: 170px;">เป้าหมายรวม (Target: kg)</th>
+              <th style="width: 180px;">ใช้งานจริงรวม (Actual: kg)</th>
+              <th style="width: 140px;">ผลต่าง (Diff: kg)</th>
+              <th style="width: 140px;">เฉลี่ยต่อรอบ (kg/ครั้ง)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="7" class="text-center py-3 text-muted">กำลังประมวลผลข้อมูล...</td>
+            </tr>
+          </tbody>
+          <tfoot style="background-color: #1a2536; border-top: 2px solid #3b82f6; font-weight: bold;">
+            <tr>
+              <td colspan="2" class="text-center">รวมทั้งหมด</td>
+              <td class="text-num text-info" id="total-batches">0</td>
+              <td class="text-num" id="total-target">0.00</td>
+              <td class="text-num text-success" id="total-actual">0.00</td>
+              <td class="text-num" id="total-diff">0.00</td>
+              <td class="text-num" id="total-avg">0.00</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    </div>
+
+    <!-- 6. ตารางประวัติบันทึกการชั่งละเอียด (SCADA Event & Transaction Log) -->
+    <div class="scada-panel mb-4">
+      <div class="scada-panel-header">
+        <span><i class="bi bi-card-checklist text-info me-2"></i>ประวัติการบันทึกการชั่ง (Transaction Details)</span>
+        <span class="small text-muted">พบทั้งหมด <b id="detail-count" class="text-white">0</b> รายการ (แสดงหน้าละ 20 รายการ)</span>
+      </div>
+      <div class="table-container">
+        <table class="table table-scada table-hover align-middle text-center mb-0" id="detail-table">
+          <thead>
+            <tr>
+              <th style="width: 50px;">ลำดับ</th>
+              <th style="width: 160px;">วัน-เวลา (Timestamp)</th>
+              <th class="text-start ps-3">ชื่อสารเคมี (Chemical)</th>
+              <th style="width: 130px;">โหมด (Mode)</th>
+              <th style="width: 120px;">Target (kg)</th>
+              <th style="width: 120px;">Resulting</th>
+              <th style="width: 120px;">Actual (kg)</th>
+              <th style="width: 120px;">ผลต่าง (Diff)</th>
+              <th style="width: 110px;">สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="9" class="text-center py-4 text-muted">กำลังโหลดข้อมูลจาก Google Sheets...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- แถบเลื่อนหน้า Pagination << หน้า >> -->
+      <div class="p-3 bg-dark bg-opacity-50 border-top border-secondary d-flex justify-content-between align-items-center flex-wrap gap-2" id="pagination-wrapper" style="display: none;">
+        <div class="small text-muted" id="pagination-info">
+          แสดงรายการที่ 1 ถึง 20 จากทั้งหมด 0 รายการ
+        </div>
+        <div class="d-flex align-items-center gap-1 flex-wrap" id="pagination-buttons">
+          <!-- ปุ่ม << หน้า >> จะถูกสร้างขึ้นที่นี่ -->
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Modal สำหรับตั้งค่า Google Web App URL -->
+  <div class="modal fade" id="configModal" tabindex="-1" aria-labelledby="configModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content bg-dark text-white border-secondary">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title fw-bold" id="configModalLabel">⚙️ ตั้งค่า Web App URL (API Connection)</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-muted">
+            ใส่ URL ของ Google Apps Script Web App ที่ได้จาก Deploy
+          </p>
+          <div class="mb-3">
+            <label class="form-label text-info fw-semibold">Web App URL:</label>
+            <input type="text" class="form-control" id="modal-webapp-url">
+          </div>
+          <div class="alert alert-info py-2 small bg-opacity-25 text-info border-info">
+            💡 ระบบจะบันทึก URL นี้ไว้ในเบราว์เซอร์อัตโนมัติ
+          </div>
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="button" class="btn btn-primary" onclick="saveWebAppUrl()">บันทึกและเชื่อมต่อ</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- โหลด Bootstrap 5 JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // URL เริ่มต้นของ Google Apps Script Web App
+    const DEFAULT_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbypaCUR6SFtNcLl1X4fti6yLZXWvic1h01S2cRS9wgJMzUAx82tOhnXd3yWu1J4DVbtcA/exec";
+
+    function getWebAppUrl() {
+      return localStorage.getItem('gas_web_app_url') || DEFAULT_WEB_APP_URL;
+    }
+
+    function saveWebAppUrl() {
+      var input = document.getElementById('modal-webapp-url').value.trim();
+      if (input) {
+        localStorage.setItem('gas_web_app_url', input);
+      } else {
+        localStorage.removeItem('gas_web_app_url');
+      }
+      var modalEl = document.getElementById('configModal');
+      var modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+      loadData();
+    }
+
+    // ตัวแปรเก็บข้อมูลและกราฟ
+    let rawData = [];
+    let barChartInstance = null;
+    let trendChartInstance = null;
+
+    window.onload = function() {
+      startLiveClock();
+      document.getElementById('modal-webapp-url').value = getWebAppUrl();
+      loadData();
+    };
+
+    // นาฬิกาดิจิทัล
+    function startLiveClock() {
+      function update() {
+        var now = new Date();
+        var h = String(now.getHours()).padStart(2, '0');
+        var m = String(now.getMinutes()).padStart(2, '0');
+        var s = String(now.getSeconds()).padStart(2, '0');
+        document.getElementById('live-clock').innerText = h + ':' + m + ':' + s;
+      }
+      update();
+      setInterval(update, 1000);
+    }
+
+    // ฟังก์ชันดึงข้อมูลจาก Google Apps Script
+    function loadData() {
+      document.getElementById('comm-status').innerText = 'SYNCING...';
+      document.getElementById('comm-status').className = 'text-warning';
+
+      document.querySelector('#detail-table tbody').innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary me-2"></div>กำลังเชื่อมต่อข้อมูลจาก Google Apps Script...</td></tr>';
+      document.querySelector('#summary-table tbody').innerHTML = '<tr><td colspan="7" class="text-center py-3 text-muted">กำลังโหลดข้อมูล...</td></tr>';
+      document.getElementById('latest-cards-container').innerHTML = '<div class="col-12 text-center py-4 text-muted"><div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังอัปเดตสถานีตาชั่ง...</div>';
+
+      var url = getWebAppUrl();
+
+      fetch(url)
+        .then(function(res) {
+          if (!res.ok) throw new Error('HTTP Status ' + res.status);
+          return res.json();
+        })
+        .then(function(data) {
+          onSuccess(data);
+        })
+        .catch(function(err) {
+          fetchJsonpFallback(url, err);
+        });
+    }
+
+    function fetchJsonpFallback(url, originalError) {
+      var callbackName = 'gasCallback_' + Math.round(100000 * Math.random());
+      var script = document.createElement('script');
+      var sep = url.indexOf('?') > -1 ? '&' : '?';
+      script.src = url + sep + 'callback=' + callbackName;
+
+      var timer = setTimeout(function() {
+        cleanup();
+        onError(originalError);
+      }, 10000);
+
+      window[callbackName] = function(data) {
+        clearTimeout(timer);
+        cleanup();
+        onSuccess(data);
+      };
+
+      function cleanup() {
+        if (script.parentNode) script.parentNode.removeChild(script);
+        delete window[callbackName];
+      }
+
+      script.onerror = function() {
+        clearTimeout(timer);
+        cleanup();
+        onError(originalError);
+      };
+
+      document.body.appendChild(script);
+    }
+
+    function onSuccess(data) {
+      document.getElementById('comm-status').innerText = 'ONLINE';
+      document.getElementById('comm-status').className = 'text-success';
+      document.getElementById('last-update-time').innerText = 'อัปเดต: ' + new Date().toLocaleTimeString('th-TH');
+
+      if (!data || !Array.isArray(data) || data.length <= 1) {
+        document.querySelector('#detail-table tbody').innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">ยังไม่มีข้อมูลในชีต</td></tr>';
+        document.querySelector('#summary-table tbody').innerHTML = '<tr><td colspan="7" class="text-center py-3 text-muted">ยังไม่มีข้อมูล</td></tr>';
+        document.getElementById('latest-cards-container').innerHTML = '<div class="col-12 text-center py-3 text-muted">ยังไม่มีข้อมูลการชั่งในระบบ</div>';
+        return;
+      }
+
+      rawData = data.slice(1);
+
+      // สร้างการ์ดแสดงการใช้งานล่าสุดของแต่ละตาชั่ง (SCADA Mimic Cards)
+      renderLatestCards(rawData);
+
+      // สร้างตัวเลือก Dropdown สารเคมี
+      buildFilterDropdowns(rawData);
+
+      // คำนวณสรุปข้อมูล, กราฟ, และตาราง
+      filterData();
+    }
+
+    function onError(error) {
+      document.getElementById('comm-status').innerText = 'OFFLINE';
+      document.getElementById('comm-status').className = 'text-danger';
+      var msg = error && error.message ? error.message : String(error);
+      document.querySelector('#detail-table tbody').innerHTML = 
+        '<tr><td colspan="9" class="text-center py-4 text-danger">' +
+        'เกิดข้อผิดพลาดในการดึงข้อมูล: ' + msg + '<br>' +
+        '<small class="text-muted">กรุณาตรวจสอบว่า Deploy Apps Script เป็น "Who has access: Anyone" แล้ว</small>' +
+        '</td></tr>';
+      document.getElementById('latest-cards-container').innerHTML = '<div class="col-12 text-center py-3 text-danger">ไม่สามารถโหลดข้อมูลได้</div>';
+    }
+
+    // ฟังก์ชันช่วยจำแนกชื่อสารเคมีและโหมด
+    function parseScaleInfo(fullName) {
+      var str = String(fullName || '').trim();
+      var mode = "Unknown";
+      if (str.indexOf("Mode Weight") > -1) {
+        mode = "Mode Weight";
+      } else if (str.indexOf("Mode Timer") > -1) {
+        mode = "Mode Timer";
+      }
+
+      var chemical = "Other";
+      if (str.indexOf("CAUSTIC") > -1) {
+        chemical = "CAUSTIC SODA 50%";
+      } else if (str.indexOf("LS9") > -1) {
+        chemical = "LS9";
+      } else if (str.indexOf("UD1") > -1) {
+        chemical = "UD1";
+      } else if (str.indexOf("LAS") > -1) {
+        chemical = "LAS";
+      } else {
+        chemical = str.replace(/Mode\s+(Weight|Timer)\s*/i, '').trim() || str;
+      }
+
+      return {
+        fullName: str,
+        mode: mode,
+        chemical: chemical
+      };
+    }
+
+    // 1. การ์ดการใช้งานล่าสุดของแต่ละตาชั่ง สไตล์ SCADA Mimic
+    function renderLatestCards(rows) {
+      var container = document.getElementById('latest-cards-container');
+      var latestMap = {};
+
+      for (var i = rows.length - 1; i >= 0; i--) {
+        var r = rows[i];
+        var scaleName = String(r[4] || '').trim();
+        if (scaleName && !latestMap[scaleName]) {
+          latestMap[scaleName] = {
+            timestamp: r[0],
+            target: r[1],
+            resulting: r[2],
+            actual: r[3],
+            name: scaleName
+          };
+        }
+      }
+
+      var scaleKeys = Object.keys(latestMap);
+      if (scaleKeys.length === 0) {
+        container.innerHTML = '<div class="col-12 text-center py-3 text-muted">ยังไม่มีข้อมูลการชั่ง</div>';
+        return;
+      }
+
+      var html = '';
+      scaleKeys.sort().forEach(function(scale) {
+        var item = latestMap[scale];
+        var scaleInfo = parseScaleInfo(item.name);
+        var dateObj = parseDateSafe(item.timestamp);
+        var dateStr = dateObj ? formatDateTime(dateObj) : (item.timestamp || '-');
+
+        var targetNum = parseFloat(item.target);
+        var actualNum = parseFloat(item.actual);
+        var diffHtml = '<span class="text-muted">-</span>';
+        var percent = 0;
+
+        if (!isNaN(targetNum) && !isNaN(actualNum)) {
+          var diff = actualNum - targetNum;
+          var sign = diff > 0 ? '+' : '';
+          var diffColor = Math.abs(diff) <= 0.5 ? '#10b981' : (diff > 0 ? '#ef4444' : '#f59e0b');
+          diffHtml = '<span style="color:' + diffColor + '; font-weight: bold;">' + sign + diff.toFixed(2) + ' kg</span>';
+
+          if (targetNum > 0) {
+            percent = Math.min(100, Math.max(0, (actualNum / targetNum) * 100));
+          }
+        }
+
+        var modeBadgeClass = scaleInfo.mode === 'Mode Weight' ? 'bg-success' : 'bg-primary';
+
+        html += '<div class="col-md-6 col-lg-4 col-xl">';
+        html += '  <div class="station-mimic-card">';
+        html += '    <div class="d-flex justify-content-between align-items-center mb-1">';
+        html += '      <span class="fw-bold text-white text-truncate" title="' + item.name + '">🧪 ' + scaleInfo.chemical + '</span>';
+        html += '      <span class="badge ' + modeBadgeClass + ' small">' + scaleInfo.mode + '</span>';
+        html += '    </div>';
+        html += '    <div class="small text-muted mb-2"><i class="bi bi-clock me-1"></i>' + dateStr + '</div>';
+
+        // หน้าปัด Target vs Actual
+        html += '    <div class="row g-2 mb-2">';
+        html += '      <div class="col-6">';
+        html += '        <div class="readout-box readout-target">';
+        html += '          <div class="readout-label">TARGET (SV)</div>';
+        html += '          <div class="readout-value text-secondary">' + (item.target !== undefined && item.target !== "" ? item.target : '-') + ' <small class="fs-6 fw-normal">kg</small></div>';
+        html += '        </div>';
+        html += '      </div>';
+        html += '      <div class="col-6">';
+        html += '        <div class="readout-box readout-actual">';
+        html += '          <div class="readout-label text-info">ACTUAL (PV)</div>';
+        html += '          <div class="readout-value text-success">' + (item.actual !== undefined && item.actual !== "" ? item.actual : '-') + ' <small class="fs-6 fw-normal">kg</small></div>';
+        html += '        </div>';
+        html += '      </div>';
+        html += '    </div>';
+
+        // เกจความคืบหน้า
+        html += '    <div class="d-flex justify-content-between small text-muted">';
+        html += '      <span>BATCH RATIO</span>';
+        html += '      <span class="text-info fw-bold">' + percent.toFixed(1) + '%</span>';
+        html += '    </div>';
+        html += '    <div class="scada-progress">';
+        html += '      <div class="scada-progress-bar" style="width: ' + percent + '%;"></div>';
+        html += '    </div>';
+
+        // Footer: Resulting & Diff
+        html += '    <div class="d-flex justify-content-between small text-muted pt-2 border-top border-secondary mt-2">';
+        html += '      <span>Resulting: <b class="text-white">' + (item.resulting !== undefined && item.resulting !== "" ? item.resulting : '-') + '</b></span>';
+        html += '      <span>ผลต่าง: ' + diffHtml + '</span>';
+        html += '    </div>';
+
+        html += '  </div>';
+        html += '</div>';
+      });
+
+      container.innerHTML = html;
+    }
+
+    function buildFilterDropdowns(rows) {
+      var chemSelect = document.getElementById('chemical-filter');
+      var currentChem = chemSelect.value;
+      var chemicals = { "CAUSTIC SODA 50%": true, "LS9": true, "UD1": true, "LAS": true };
+
+      rows.forEach(function(r) {
+        var info = parseScaleInfo(r[4]);
+        if (info.chemical && info.chemical !== 'Other') {
+          chemicals[info.chemical] = true;
+        }
+      });
+
+      chemSelect.innerHTML = '<option value="ALL">-- ทุกสารเคมี (แสดงรวม) --</option>';
+      Object.keys(chemicals).sort().forEach(function(c) {
+        var opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        chemSelect.appendChild(opt);
+      });
+
+      if (currentChem && (currentChem === 'ALL' || chemicals[currentChem])) {
+        chemSelect.value = currentChem;
+      }
+    }
+
+    function filterData() {
+      if (!rawData || rawData.length === 0) return;
+
+      var startStr = document.getElementById('start-date').value;
+      var endStr = document.getElementById('end-date').value;
+      var selectedChemical = document.getElementById('chemical-filter').value;
+      var selectedMode = document.getElementById('mode-filter').value;
+
+      var startDate = startStr ? new Date(startStr + 'T00:00:00') : null;
+      var endDate = endStr ? new Date(endStr + 'T23:59:59') : null;
+
+      var statusParts = [];
+      if (startStr && endStr) statusParts.push(startStr + ' ถึง ' + endStr);
+      else if (startStr) statusParts.push('ตั้งแต่ ' + startStr);
+      else if (endStr) statusParts.push('ถึง ' + endStr);
+      else statusParts.push('ทุกช่วงเวลา');
+
+      if (selectedChemical !== 'ALL') statusParts.push('เคมี: ' + selectedChemical);
+      if (selectedMode !== 'ALL') statusParts.push('โหมด: ' + selectedMode);
+
+      document.getElementById('filter-status').innerText = statusParts.join(' | ');
+
+      var filtered = rawData.filter(function(row) {
+        var info = parseScaleInfo(row[4]);
+
+        if (selectedChemical !== 'ALL' && info.chemical !== selectedChemical) {
+          return false;
+        }
+
+        if (selectedMode !== 'ALL' && info.mode !== selectedMode) {
+          return false;
+        }
+
+        var rowDate = parseDateSafe(row[0]);
+        if (rowDate) {
+          if (startDate && rowDate < startDate) return false;
+          if (endDate && rowDate > endDate) return false;
+        }
+
+        return true;
+      });
+
+      renderSummaryTableAndCharts(filtered, selectedMode, selectedChemical);
+      renderDetailTable(filtered);
+    }
+
+    // สรุปยอดและวาดกราฟ SCADA ทั้ง 2 ตัว
+    function renderSummaryTableAndCharts(rows, selectedMode, selectedChemical) {
+      var tbody = document.querySelector('#summary-table tbody');
+      var chemMap = {};
+
+      var grandBatches = 0;
+      var grandTarget = 0;
+      var grandActual = 0;
+
+      // ปรับเปลี่ยนหัวตารางและชื่อตามเงื่อนไขตัวกรองโหมด
+      var isAllModes = (selectedMode === 'ALL');
+      var colNameEl = document.getElementById('summary-col-name');
+      var panelTitleEl = document.getElementById('summary-panel-title');
+      var barTitleEl = document.getElementById('barchart-title');
+
+      if (isAllModes) {
+        colNameEl.innerText = 'ชื่อสารเคมี (รวมทุกโหมด)';
+        panelTitleEl.innerText = 'สรุปปริมาณการใช้งานเคมีแต่ละตัว (รวมทุกโหมด)';
+        barTitleEl.innerText = 'ปริมาณเคมีแต่ละตัวที่ใช้งานจริงรวม (Total Chemical Used kg)';
+      } else {
+        colNameEl.innerText = 'ชื่อสารเคมี (' + selectedMode + ')';
+        panelTitleEl.innerText = 'สรุปปริมาณการใช้งานเคมี (เฉพาะ ' + selectedMode + ')';
+        barTitleEl.innerText = 'ปริมาณเคมีที่ใช้งานจริงรวม (' + selectedMode + ')';
+      }
+
+      rows.forEach(function(r) {
+        var info = parseScaleInfo(r[4]);
+        // ถ้าไม่ได้เลือกโหมด ให้จัดกลุ่มตามชื่อสารเคมีเป็นหลัก (รวมโหมด Weight และ Timer เข้าด้วยกัน)
+        var key = info.chemical;
+        var target = parseFloat(r[1]) || 0;
+        var actual = parseFloat(r[3]) || 0;
+
+        if (!chemMap[key]) {
+          chemMap[key] = {
+            chemical: info.chemical,
+            batches: 0,
+            targetTotal: 0,
+            actualTotal: 0
+          };
+        }
+
+        chemMap[key].batches++;
+        chemMap[key].targetTotal += target;
+        chemMap[key].actualTotal += actual;
+
+        grandBatches++;
+        grandTarget += target;
+        grandActual += actual;
+      });
+
+      var chemKeys = Object.keys(chemMap);
+      if (chemKeys.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-3 text-muted">ไม่พบข้อมูลตามช่วงเวลาและเงื่อนไขที่เลือก</td></tr>';
+        document.getElementById('total-batches').innerText = '0';
+        document.getElementById('total-target').innerText = '0.00';
+        document.getElementById('total-actual').innerText = '0.00';
+        document.getElementById('total-diff').innerText = '0.00';
+        document.getElementById('total-avg').innerText = '0.00';
+        if (barChartInstance) barChartInstance.destroy();
+        if (trendChartInstance) trendChartInstance.destroy();
+        return;
+      }
+
+      var html = '';
+      chemKeys.sort().forEach(function(name, index) {
+        var item = chemMap[name];
+        var diff = item.actualTotal - item.targetTotal;
+        var avg = item.batches > 0 ? (item.actualTotal / item.batches) : 0;
+        var diffSign = diff > 0 ? '+' : '';
+        var diffColor = Math.abs(diff) <= 0.5 ? '#10b981' : (diff > 0 ? '#ef4444' : '#38bdf8');
+
+        html += '<tr>';
+        html += '<td class="text-center text-muted">' + (index + 1) + '</td>';
+        html += '<td class="fw-bold text-white text-start ps-3"><span class="text-info me-1">🧪</span> ' + item.chemical + '</td>';
+        html += '<td class="text-num text-info">' + item.batches.toLocaleString() + '</td>';
+        html += '<td class="text-num text-secondary">' + item.targetTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td>';
+        html += '<td class="text-num fw-bold text-success">' + item.actualTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td>';
+        html += '<td class="text-num" style="color:' + diffColor + '; font-weight:bold;">' + diffSign + diff.toFixed(2) + '</td>';
+        html += '<td class="text-num">' + avg.toFixed(2) + '</td>';
+        html += '</tr>';
+      });
+
+      tbody.innerHTML = html;
+
+      var grandDiff = grandActual - grandTarget;
+      var grandAvg = grandBatches > 0 ? (grandActual / grandBatches) : 0;
+      document.getElementById('total-batches').innerText = grandBatches.toLocaleString();
+      document.getElementById('total-target').innerText = grandTarget.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      document.getElementById('total-actual').innerText = grandActual.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      document.getElementById('total-diff').innerText = (grandDiff > 0 ? '+' : '') + grandDiff.toFixed(2);
+      document.getElementById('total-avg').innerText = grandAvg.toFixed(2);
+
+      // วาดกราฟ
+      renderBarChart(chemMap);
+      renderTrendChart(rows);
+    }
+
+    // กราฟแท่ง ปริมาณเคมีรวมแต่ละตัว
+    function renderBarChart(chemMap) {
+      var ctx = document.getElementById('barChart').getContext('2d');
+      var labels = [];
+      var actualData = [];
+      var targetData = [];
+
+      Object.keys(chemMap).sort().forEach(function(k) {
+        labels.push(chemMap[k].chemical);
+        actualData.push(chemMap[k].actualTotal);
+        targetData.push(chemMap[k].targetTotal);
+      });
+
+      if (barChartInstance) barChartInstance.destroy();
+
+      barChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'ใช้จริงรวม (Actual: kg)',
+              data: actualData,
+              backgroundColor: '#10b981',
+              borderRadius: 4
+            },
+            {
+              label: 'เป้าหมายรวม (Target: kg)',
+              data: targetData,
+              backgroundColor: '#475569',
+              borderRadius: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { labels: { color: '#cbd5e1' } }
+          },
+          scales: {
+            y: {
+              grid: { color: '#334155' },
+              ticks: { color: '#94a3b8' },
+              title: { display: true, text: 'กิโลกรัม (kg)', color: '#94a3b8' }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#94a3b8' }
+            }
+          }
+        }
+      });
+    }
+
+    // กราฟเส้น SCADA Process Trend
+    function renderTrendChart(rows) {
+      var ctx = document.getElementById('trendChart').getContext('2d');
+      // แสดงตัวอย่าง 40 รายการล่าสุด
+      var sample = rows.slice(-40);
+      var labels = [];
+      var targetData = [];
+      var actualData = [];
+
+      sample.forEach(function(r) {
+        var d = parseDateSafe(r[0]);
+        labels.push(d ? formatTime(d) : String(r[0] || ''));
+        targetData.push(parseFloat(r[1]) || 0);
+        actualData.push(parseFloat(r[3]) || 0);
+      });
+
+      if (trendChartInstance) trendChartInstance.destroy();
+
+      trendChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'TARGET (SV: kg)',
+              data: targetData,
+              borderColor: '#38bdf8',
+              borderWidth: 2,
+              borderDash: [5, 4],
+              pointRadius: 2,
+              fill: false
+            },
+            {
+              label: 'ACTUAL (PV: kg)',
+              data: actualData,
+              borderColor: '#10b981',
+              backgroundColor: 'rgba(16, 185, 129, 0.1)',
+              borderWidth: 2.5,
+              pointRadius: 3,
+              fill: true,
+              tension: 0.2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { labels: { color: '#cbd5e1' } }
+          },
+          scales: {
+            y: {
+              grid: { color: '#334155' },
+              ticks: { color: '#94a3b8' },
+              title: { display: true, text: 'น้ำหนัก (kg)', color: '#94a3b8' }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#94a3b8' }
+            }
+          }
+        }
+      });
+    }
+
+    // ตัวแปรสำหรับ Pagination
+    let currentDetailRows = [];
+    let currentPage = 1;
+    const PAGE_SIZE = 20;
+
+    // ตารางประวัติบันทึกการชั่ง
+    function renderDetailTable(rows) {
+      currentDetailRows = rows.slice().reverse(); // เอาล่าสุดขึ้นก่อน
+      currentPage = 1; // รีเซ็ตมาหน้า 1 ทุกครั้งที่กรองใหม่
+      displayCurrentPage();
+    }
+
+    function displayCurrentPage() {
+      var tbody = document.querySelector('#detail-table tbody');
+      var totalRecords = currentDetailRows.length;
+      document.getElementById('detail-count').innerText = totalRecords.toLocaleString();
+
+      var paginationWrapper = document.getElementById('pagination-wrapper');
+
+      if (totalRecords === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">ไม่พบข้อมูลตามช่วงเวลาที่เลือก</td></tr>';
+        if (paginationWrapper) paginationWrapper.style.setProperty('display', 'none', 'important');
+        return;
+      }
+
+      var totalPages = Math.ceil(totalRecords / PAGE_SIZE);
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      var startIndex = (currentPage - 1) * PAGE_SIZE;
+      var endIndex = Math.min(startIndex + PAGE_SIZE, totalRecords);
+      var pageRows = currentDetailRows.slice(startIndex, endIndex);
+
+      var html = '';
+      pageRows.forEach(function(r, index) {
+        var rowNum = startIndex + index + 1;
+        var dateObj = parseDateSafe(r[0]);
+        var dateStr = dateObj ? formatDateTime(dateObj) : (r[0] || '-');
+        var scaleInfo = parseScaleInfo(r[4]);
+
+        var target = parseFloat(r[1]);
+        var actual = parseFloat(r[3]);
+        var diffHtml = '<span class="text-muted">-</span>';
+        var statusBadge = '<span class="badge bg-secondary">UNKNOWN</span>';
+
+        if (!isNaN(target) && !isNaN(actual)) {
+          var diff = actual - target;
+          var sign = diff > 0 ? '+' : '';
+          var isNormal = Math.abs(diff) <= 0.5;
+          var diffColor = isNormal ? '#10b981' : (diff > 0 ? '#ef4444' : '#38bdf8');
+          diffHtml = '<span style="color:' + diffColor + '; font-weight:bold;">' + sign + diff.toFixed(2) + '</span>';
+
+          if (isNormal) {
+            statusBadge = '<span class="badge bg-success-subtle text-success border border-success">NORMAL</span>';
+          } else {
+            statusBadge = '<span class="badge bg-danger-subtle text-danger border border-danger">DEVIATION</span>';
+          }
+        }
+
+        var modeBadgeClass = scaleInfo.mode === 'Mode Weight' ? 'bg-success' : 'bg-primary';
+
+        html += '<tr>';
+        html += '<td class="text-muted">' + rowNum + '</td>';
+        html += '<td class="text-info">' + dateStr + '</td>';
+        html += '<td class="text-start ps-3 fw-semibold text-white">🧪 ' + scaleInfo.chemical + '</td>';
+        html += '<td><span class="badge ' + modeBadgeClass + ' small">' + scaleInfo.mode + '</span></td>';
+        html += '<td class="text-secondary">' + (r[1] !== undefined && r[1] !== "" ? r[1] : '-') + '</td>';
+        html += '<td class="text-muted">' + (r[2] !== undefined && r[2] !== "" ? r[2] : '-') + '</td>';
+        html += '<td class="fw-bold text-success">' + (r[3] !== undefined && r[3] !== "" ? r[3] : '-') + '</td>';
+        html += '<td>' + diffHtml + '</td>';
+        html += '<td>' + statusBadge + '</td>';
+        html += '</tr>';
+      });
+
+      tbody.innerHTML = html;
+
+      // จัดการตัวเลื่อนหน้า Pagination
+      if (totalRecords > PAGE_SIZE) {
+        paginationWrapper.style.setProperty('display', 'flex', 'important');
+        document.getElementById('pagination-info').innerText = 
+          'แสดงรายการที่ ' + (startIndex + 1).toLocaleString() + ' ถึง ' + endIndex.toLocaleString() + ' จากทั้งหมด ' + totalRecords.toLocaleString() + ' รายการ (หน้า ' + currentPage + ' จาก ' + totalPages + ')';
+        renderPaginationButtons(totalPages, currentPage);
+      } else {
+        paginationWrapper.style.setProperty('display', 'none', 'important');
+      }
+    }
+
+    // ฟังก์ชันสร้างปุ่มเลื่อนหน้า << หน้า >>
+    function renderPaginationButtons(totalPages, page) {
+      var container = document.getElementById('pagination-buttons');
+      var html = '';
+
+      var disabledFirst = (page === 1) ? 'disabled' : '';
+      var disabledLast = (page === totalPages) ? 'disabled' : '';
+
+      html += '<button class="btn btn-sm btn-outline-secondary px-2 text-white" ' + disabledFirst + ' onclick="goToPage(1)" title="หน้าแรกสุด">&laquo;&laquo; หน้าแรก</button>';
+      html += '<button class="btn btn-sm btn-outline-secondary px-2 text-white" ' + disabledFirst + ' onclick="goToPage(' + (page - 1) + ')" title="หน้าก่อนหน้า">&laquo; ก่อนหน้า</button>';
+
+      // ปุ่มตัวเลขหน้า
+      var startP = Math.max(1, page - 2);
+      var endP = Math.min(totalPages, page + 2);
+
+      if (startP > 1) {
+        html += '<button class="btn btn-sm btn-outline-secondary px-2 text-white" onclick="goToPage(1)">1</button>';
+        if (startP > 2) html += '<span class="text-muted px-1">...</span>';
+      }
+
+      for (var p = startP; p <= endP; p++) {
+        var activeClass = (p === page) ? 'btn-primary text-white fw-bold' : 'btn-outline-secondary text-white';
+        html += '<button class="btn btn-sm ' + activeClass + ' px-2" onclick="goToPage(' + p + ')">' + p + '</button>';
+      }
+
+      if (endP < totalPages) {
+        if (endP < totalPages - 1) html += '<span class="text-muted px-1">...</span>';
+        html += '<button class="btn btn-sm btn-outline-secondary px-2 text-white" onclick="goToPage(' + totalPages + ')">' + totalPages + '</button>';
+      }
+
+      html += '<button class="btn btn-sm btn-outline-secondary px-2 text-white" ' + disabledLast + ' onclick="goToPage(' + (page + 1) + ')" title="หน้าถัดไป">ถัดไป &raquo;</button>';
+      html += '<button class="btn btn-sm btn-outline-secondary px-2 text-white" ' + disabledLast + ' onclick="goToPage(' + totalPages + ')" title="หน้าสุดท้าย">หน้าสุดท้าย &raquo;&raquo;</button>';
+
+      container.innerHTML = html;
+    }
+
+    function goToPage(p) {
+      currentPage = p;
+      displayCurrentPage();
+      var tableEl = document.getElementById('detail-table');
+      if (tableEl) tableEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function setQuickDate(type) {
+      var now = new Date();
+      var start = new Date();
+      var end = new Date();
+
+      if (type === 'today') {
+      } else if (type === 'yesterday') {
+        start.setDate(now.getDate() - 1);
+        end.setDate(now.getDate() - 1);
+      } else if (type === '7days') {
+        start.setDate(now.getDate() - 7);
+      } else if (type === '30days') {
+        start.setDate(now.getDate() - 30);
+      } else if (type === 'all') {
+        document.getElementById('start-date').value = '';
+        document.getElementById('end-date').value = '';
+        filterData();
+        return;
+      }
+
+      document.getElementById('start-date').value = toISODate(start);
+      document.getElementById('end-date').value = toISODate(end);
+      filterData();
+    }
+
+    function clearFilter() {
+      document.getElementById('chemical-filter').value = 'ALL';
+      document.getElementById('mode-filter').value = 'ALL';
+      setQuickDate('all');
+    }
+
+    function toISODate(d) {
+      var pad = function(n) { return n < 10 ? '0' + n : n; };
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    }
+
+    function parseDateSafe(val) {
+      if (!val) return null;
+      var cleanVal = String(val).replace(/\s*\(.*?\)/, '');
+      var d = new Date(cleanVal);
+      if (d instanceof Date && !isNaN(d.getTime())) return d;
+      var dOrig = new Date(val);
+      return (dOrig instanceof Date && !isNaN(dOrig.getTime())) ? dOrig : null;
+    }
+
+    function formatTime(d) {
+      var pad = function(n) { return n < 10 ? '0' + n : n; };
+      return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    }
+
+    function formatDateTime(d) {
+      var pad = function(n) { return n < 10 ? '0' + n : n; };
+      return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    }
+  </script>
+</body>
+</html>

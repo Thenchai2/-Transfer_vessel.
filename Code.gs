@@ -1,0 +1,168 @@
+function doPost(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // --- ฟังก์ชันเสริม: ตรวจสอบสร้างชีต และสร้างหัวคอลัมน์อัตโนมัติ ---
+  function getOrCreateSheet(sheetName) {
+    var sheet = ss.getSheetByName(sheetName);
+    if (sheet == null) {
+      // ถ้าไม่มีชีตชื่อนี้ ให้สร้างขึ้นมาใหม่
+      sheet = ss.insertSheet(sheetName);
+      
+      // เมื่อสร้างชีตใหม่ ให้ใส่หัวคอลัมน์ 5 คอลัมน์ (เพิ่ม Scale Name)
+      sheet.appendRow(["Timestamp", "Target weight", "Resulting weight", "Actual weight", "Scale Name"]);
+      
+      // ทำให้หัวคอลัมน์ A1-E1 เป็นตัวหนา และแช่แข็งแถวแรกไว้
+      sheet.getRange("A1:E1").setFontWeight("bold");
+      sheet.setFrozenRows(1);
+    }
+    return sheet;
+  }
+  // ------------------------------------------
+
+  // เรียกใช้ฟังก์ชันสร้างชีตหลักที่จะรวมข้อมูลทั้งหมด
+  var mainSheet = getOrCreateSheet("รวมข้อมูลตาชั่ง");
+  
+  var data = JSON.parse(e.postData.contents);
+  var timestamp = new Date();
+  
+  // 1. ดึงข้อมูล Mode Timer  LS9
+  var d5032 = data.D5032;
+  var d102 = (data.D102 !== undefined) ? "'" + data.D102 : undefined; 
+  var d5040 = data.D5040;
+  
+  // 2. ดึงข้อมูล Mode Timer  UD1
+  var d5048 = data.D5048;
+  var d118 = (data.D118 !== undefined) ? "'" + data.D118 : undefined; 
+  var d5052 = data.D5052;
+
+  // 3. ดึงข้อมูล Mode Timer  LAS
+  var d5060 = data.D5060;
+  var d134 = (data.D134 !== undefined) ? "'" + data.D134 : undefined; 
+  var d5064 = data.D5064;
+
+  // 4. ดึงข้อมูล Mode Timer  CAUSTIC SODA 50%
+  var d5072 = data.D5072;
+  var d150 = (data.D150 !== undefined) ? "'" + data.D150 : undefined; 
+  var d5076 = data.D5076;
+
+  // 5. ดึงข้อมูล "Mode Weight  CAUSTIC SODA 50%" (แก้ไขชื่อตัวแปรให้ถูกต้องแล้ว)
+  var d5108 = data.D5108;
+  var d178 = (data.D178 !== undefined) ? "'" + data.D178 : undefined; 
+  var d5076_weight = data.D5076_weight; // <-- หมายเหตุ: ถ้า Actual weight ของโหมดนี้ส่งมาเป็น D ตัวอื่น (เช่น D5112) ให้แก้ตรง data.D5076 นี้นะครับ
+
+  // --- บันทึกข้อมูลลงชีตเดียว และเพิ่มชื่อตาชั่งต่อท้าย ---
+
+  // 1. ข้อมูล "Mode Timer  LS9"
+  if (d5032 !== undefined || data.D102 !== undefined || d5040 !== undefined) {
+    mainSheet.appendRow([timestamp, d5032, d102, d5040, "Mode Timer  LS9"]);
+  }
+
+  // 2. ข้อมูล "Mode Timer  UD1"
+  if (d5048 !== undefined || data.D118 !== undefined || d5052 !== undefined) {
+    mainSheet.appendRow([timestamp, d5048, d118, d5052, "Mode Timer  UD1"]); 
+  }
+
+  // 3. ข้อมูล "Mode Timer  LAS"
+  if (d5060 !== undefined || data.D134 !== undefined || d5064 !== undefined) {
+    mainSheet.appendRow([timestamp, d5060, d134, d5064, "Mode Timer  LAS"]); 
+  }
+
+  // 4. ข้อมูล "Mode Timer  CAUSTIC SODA 50%" 
+  if (d5072 !== undefined || data.D150 !== undefined || d5076 !== undefined) {
+    mainSheet.appendRow([timestamp, d5072, d150, d5076, "Mode Timer  CAUSTIC SODA 50%"]); 
+  }
+
+  // 5. ข้อมูล "Mode Weight  CAUSTIC SODA 50%" (แก้ไขตัวแปรให้ตรงกับการเช็คเงื่อนไข)
+  if (d5108 !== undefined || data.D178 !== undefined || d5076_weight !== undefined) {
+    mainSheet.appendRow([timestamp, d5108, d178, d5076_weight, "Mode Weight  CAUSTIC SODA 50%"]); 
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({
+    "result": "success", 
+    "timestamp": timestamp
+  })).setMimeType(ContentService.MimeType.JSON);
+}
+
+// --- ฟังก์ชันสำหรับทดสอบจำลองการส่งข้อมูล ---
+function simulateHMI() {
+  // 1. นำ URL Web App ของคุณ (ที่ได้จากตอน Deploy) มาใส่ในเครื่องหมายคำพูดด้านล่าง
+  var webAppUrl = "https://script.google.com/macros/s/AKfycbypaCUR6SFtNcLl1X4fti6yLZXWvic1h01S2cRS9wgJMzUAx82tOhnXd3yWu1J4DVbtcA/exec"; 
+  
+  // 2. จำลองข้อมูล JSON ที่จอ HMI จะส่งมา (แก้ตัวเลขเพื่อทดสอบได้เลย)
+  var testData = {
+    // จำลองข้อมูลของ Mode Weight CAUSTIC SODA 50% ให้ดูเป็นตัวอย่าง
+    "D5108": 200,      // Target weight
+    "D178": 199.5,     // Resulting weight
+    "D5076": 199.5     // Actual weight
+  };
+  
+  var options = {
+    "method": "post",
+    "contentType": "application/json",
+    "payload": JSON.stringify(testData)
+  };
+  
+  try {
+    var response = UrlFetchApp.fetch(webAppUrl, options);
+    Logger.log("สถานะการส่ง: สำเร็จ!");
+    Logger.log("สิ่งที่ตอบกลับมา: " + response.getContentText());
+  } catch (error) {
+    Logger.log("เกิดข้อผิดพลาด: " + error.message);
+  }
+}
+
+function testAuth() {
+  UrlFetchApp.fetch("https://www.google.com");
+}
+
+
+// --- ฟังก์ชันสำหรับส่งข้อมูล JSON ให้กับหน้าเว็บภายนอก (GitHub Pages) ---
+function doGet(e) {
+  var data = getDashboardData();
+  var output = JSON.stringify(data);
+  
+  // รองรับ JSONP เผื่อกรณีเรียกข้ามโดเมนแบบพิเศษ
+  var callback = (e && e.parameter) ? e.parameter.callback : null;
+  if (callback) {
+    return ContentService.createTextOutput(callback + '(' + output + ')')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  
+  // ส่งออกข้อมูลในรูปแบบ JSON
+  return ContentService.createTextOutput(output)
+      .setMimeType(ContentService.MimeType.JSON);
+}
+
+// --- ฟังก์ชันสำหรับดึงข้อมูลจากชีตมาส่งให้หน้า Dashboard ---
+function getDashboardData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("รวมข้อมูลตาชั่ง");
+  
+  if (!sheet) {
+    return []; // ถ้ายังไม่มีชีตให้ส่งค่าว่างกลับไป
+  }
+  
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
+    return [];
+  }
+  
+  // ดึงข้อมูลทั้งหมดที่มีในชีต
+  var data = sheet.getDataRange().getValues();
+  
+  // แปลงวันที่ให้อยู่ในรูป ISO String หรือข้อความ เพื่อส่งผ่านไปยังหน้าเว็บได้อย่างเสถียร
+  var formattedData = data.map(function(row, idx) {
+    if (idx === 0) return row; // แถวหัวตารางคงเดิม
+    var dateVal = row[0];
+    var dateStr = (dateVal instanceof Date) ? dateVal.toISOString() : (dateVal ? String(dateVal) : "");
+    return [
+      dateStr,
+      row[1],
+      row[2],
+      row[3],
+      row[4] ? String(row[4]) : ""
+    ];
+  });
+  
+  return formattedData;
+}
