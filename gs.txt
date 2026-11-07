@@ -1,0 +1,232 @@
+function doPost(e) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // --- ฟังก์ชันเสริม: ตรวจสอบสร้างชีต และสร้างหัวคอลัมน์อัตโนมัติ ---
+  function getOrCreateSheet(sheetName) {
+    var sheet = ss.getSheetByName(sheetName);
+    if (sheet == null) {
+      // ถ้าไม่มีชีตชื่อนี้ ให้สร้างขึ้นมาใหม่
+      sheet = ss.insertSheet(sheetName);
+      
+      // เมื่อสร้างชีตใหม่ ให้ใส่หัวคอลัมน์ 5 คอลัมน์ (เพิ่ม Scale Name)
+      sheet.appendRow(["Timestamp", "Target weight", "Resulting weight", "Actual weight", "Scale Name"]);
+      
+      // ทำให้หัวคอลัมน์ A1-E1 เป็นตัวหนา และแช่แข็งแถวแรกไว้
+      sheet.getRange("A1:E1").setFontWeight("bold");
+      sheet.setFrozenRows(1);
+    }
+    return sheet;
+  }
+  // ------------------------------------------
+
+  // เรียกใช้ฟังก์ชันสร้างชีตหลักที่จะรวมข้อมูลทั้งหมด
+  // รับค่าจาก HMI
+  var mainSheet = getOrCreateSheet("รวมข้อมูลตาชั่ง");
+  
+  var data = JSON.parse(e.postData.contents);
+  var timestamp = new Date();
+  
+  // 1. ดึงข้อมูล Mode Timer  LS9
+  var d5032 = data.D5032;
+  var d102 = (data.D102 !== undefined) ? "'" + data.D102 : undefined; 
+  var d5040 = data.D5040;
+  
+  // 2. ดึงข้อมูล Mode Timer  UD1
+  var d5048 = data.D5048;
+  var d118 = (data.D118 !== undefined) ? "'" + data.D118 : undefined; 
+  var d5052 = data.D5052;
+
+  // 3. ดึงข้อมูล Mode Timer  LAS
+  var d5060 = data.D5060;
+  var d134 = (data.D134 !== undefined) ? "'" + data.D134 : undefined; 
+  var d5064 = data.D5064;
+
+  // 4. ดึงข้อมูล Mode Timer  CAUSTIC SODA 50%
+  var d5072 = data.D5072; // Target
+  var d150 = (data.D150 !== undefined) ? "'" + data.D150 : undefined; // Resulting
+
+  // 5. ดึงข้อมูล Mode Weight  CAUSTIC SODA 50%
+  var d5108 = data.D5108; // Target
+  var d178 = (data.D178 !== undefined) ? "'" + data.D178 : undefined; // Resulting
+
+  // ตาชั่ง CAUSTIC SODA 50% ใช้หัวชั่งตัวเดียวกัน ทั้ง Mode Timer และ Mode Weight จึงรับค่าน้ำหนักจริง (Actual weight) จาก D5076 ตัวเดียวกัน
+  var d5076 = data.D5076;
+
+  // --- ฟังก์ชันตรวจสอบว่าตาชั่งตัวนั้นมีคำสั่งทำงานจริงหรือไม่ ---
+  // ป้องกันการบันทึกมั่ว: กรองค่า 0, null, undefined ออก เพื่อให้บันทึกเฉพาะตาชั่งที่ทำงานรอบนั้นเท่านั้น
+  function isScaleActive(target, resulting, actual) {
+    var t = parseFloat(target);
+    var r = parseFloat(resulting);
+    var a = parseFloat(actual);
+    return (!isNaN(t) && t > 0) || (!isNaN(r) && r > 0) || (!isNaN(a) && a > 0);
+  }
+
+  // --- บันทึกข้อมูลลงชีตเดียว และเพิ่มชื่อตาชั่งต่อท้าย ---
+
+  // 1. ข้อมูล "Mode Timer  LS9"
+  if (isScaleActive(d5032, data.D102, d5040)) {
+    mainSheet.appendRow([timestamp, d5032, d102, d5040, "Mode Timer  LS9"]);
+  }
+
+  // 2. ข้อมูล "Mode Timer  UD1"
+  if (isScaleActive(d5048, data.D118, d5052)) {
+    mainSheet.appendRow([timestamp, d5048, d118, d5052, "Mode Timer  UD1"]); 
+  }
+
+  // 3. ข้อมูล "Mode Timer  LAS"
+  if (isScaleActive(d5060, data.D134, d5064)) {
+    mainSheet.appendRow([timestamp, d5060, d134, d5064, "Mode Timer  LAS"]); 
+  }
+
+  // 4 & 5. ข้อมูล CAUSTIC SODA 50% (PLC Interlock: เลือกระหว่าง Mode Weight หรือ Mode Timer อย่างใดอย่างหนึ่งเท่านั้น)
+  if (isScaleActive(d5108, data.D178, undefined)) {
+    // ถ้าเลือก Mode Weight (Target D5108 หรือ Resulting D178 มีค่า)
+    mainSheet.appendRow([timestamp, d5108, d178, d5076, "Mode Weight  CAUSTIC SODA 50%"]); 
+  } else if (isScaleActive(d5072, data.D150, undefined)) {
+    // ถ้าเลือก Mode Timer (Target D5072 หรือ Resulting D150 มีค่า)
+    mainSheet.appendRow([timestamp, d5072, d150, d5076, "Mode Timer  CAUSTIC SODA 50%"]); 
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({
+    "result": "success", 
+    "timestamp": timestamp
+  })).setMimeType(ContentService.MimeType.JSON);
+}
+
+// --- ฟังก์ชันจัดการเกณฑ์ % ผลต่าง (Tolerance %) ในชีต Config และ ScriptProperties ---
+function getStoredTolerance() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName("Config");
+  if (!configSheet) {
+    configSheet = ss.insertSheet("Config");
+    configSheet.appendRow(["Setting", "Value", "Description"]);
+    configSheet.appendRow(["TolerancePercent", 1.0, "เกณฑ์ % ผลต่างที่ยอมรับได้ (เช่น 1.0 คือ +-1.0%)"]);
+    configSheet.getRange("A1:C1").setFontWeight("bold");
+    configSheet.setFrozenRows(1);
+    return 1.0;
+  }
+  var val = parseFloat(configSheet.getRange("B2").getValue());
+  return (!isNaN(val) && val > 0) ? val : 1.0;
+}
+
+function setStoredTolerance(val) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName("Config");
+  if (!configSheet) {
+    configSheet = ss.insertSheet("Config");
+    configSheet.appendRow(["Setting", "Value", "Description"]);
+    configSheet.appendRow(["TolerancePercent", val, "เกณฑ์ % ผลต่างที่ยอมรับได้ (เช่น 1.0 คือ +-1.0%)"]);
+    configSheet.getRange("A1:C1").setFontWeight("bold");
+    configSheet.setFrozenRows(1);
+  } else {
+    configSheet.getRange("B2").setValue(val);
+  }
+  PropertiesService.getScriptProperties().setProperty("tolerancePercent", String(val));
+}
+
+// --- ฟังก์ชันสำหรับทดสอบจำลองการส่งข้อมูล ---
+function simulateHMI() {
+  // 1. นำ URL Web App ของคุณ (ที่ได้จากตอน Deploy) มาใส่ในเครื่องหมายคำพูดด้านล่าง
+  var webAppUrl = "https://script.google.com/macros/s/AKfycbypaCUR6SFtNcLl1X4fti6yLZXWvic1h01S2cRS9wgJMzUAx82tOhnXd3yWu1J4DVbtcA/exec"; 
+  
+  // 2. จำลองข้อมูล JSON ที่จอ HMI จะส่งมา (แก้ตัวเลขเพื่อทดสอบได้เลย)
+  var testData = {
+    // ตัวอย่าง: จำลองส่งข้อมูลของ Mode Weight CAUSTIC SODA 50%
+    "D5108": 200,      // Target weight
+    "D178": 199.5,     // Resulting weight
+    "D5076": 199.5     // Actual weight จากตาชั่ง (D5076 ตัวเดียวกัน)
+  };
+  
+  var options = {
+    "method": "post",
+    "contentType": "application/json",
+    "payload": JSON.stringify(testData)
+  };
+  
+  try {
+    var response = UrlFetchApp.fetch(webAppUrl, options);
+    Logger.log("สถานะการส่ง: สำเร็จ!");
+    Logger.log("สิ่งที่ตอบกลับมา: " + response.getContentText());
+  } catch (error) {
+    Logger.log("เกิดข้อผิดพลาด: " + error.message);
+  }
+}
+
+function testAuth() {
+  UrlFetchApp.fetch("https://www.google.com");
+}
+
+
+// --- ฟังก์ชันสำหรับส่งข้อมูล JSON ให้กับหน้าเว็บภายนอก (GitHub Pages) ---
+function doGet(e) {
+  var action = (e && e.parameter) ? e.parameter.action : null;
+  var callback = (e && e.parameter) ? e.parameter.callback : null;
+
+  // 1. ตรวจสอบการตั้งค่าเกณฑ์ Tolerance % (เมื่อมีคนเปลี่ยนจากหน้าเว็บ)
+  if (action === "setTolerance") {
+    var val = parseFloat(e.parameter.val);
+    if (!isNaN(val) && val > 0) {
+      setStoredTolerance(val);
+      var resObj = { result: "success", tolerancePercent: val };
+      var resJson = JSON.stringify(resObj);
+      if (callback) {
+        return ContentService.createTextOutput(callback + '(' + resJson + ')')
+            .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(resJson)
+          .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  // 2. ส่งข้อมูลแดชบอร์ดตามปกติ (รวม rows และเกณฑ์ tolerancePercent ล่าสุด)
+  var data = getDashboardData();
+  var output = JSON.stringify(data);
+  
+  // รองรับ JSONP เผื่อกรณีเรียกข้ามโดเมนแบบพิเศษ
+  if (callback) {
+    return ContentService.createTextOutput(callback + '(' + output + ')')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  
+  // ส่งออกข้อมูลในรูปแบบ JSON
+  return ContentService.createTextOutput(output)
+      .setMimeType(ContentService.MimeType.JSON);
+}
+
+// --- ฟังก์ชันสำหรับดึงข้อมูลจากชีตมาส่งให้หน้า Dashboard ---
+function getDashboardData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("รวมข้อมูลตาชั่ง");
+  var tolerance = getStoredTolerance();
+  
+  if (!sheet) {
+    return { rows: [], tolerancePercent: tolerance };
+  }
+  
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
+    return { rows: [], tolerancePercent: tolerance };
+  }
+  
+  // ดึงข้อมูลทั้งหมดที่มีในชีต
+  var data = sheet.getDataRange().getValues();
+  
+  // แปลงวันที่ให้อยู่ในรูป ISO String หรือข้อความ เพื่อส่งผ่านไปยังหน้าเว็บได้อย่างเสถียร
+  var formattedData = data.map(function(row, idx) {
+    if (idx === 0) return row; // แถวหัวตารางคงเดิม
+    var dateVal = row[0];
+    var dateStr = (dateVal instanceof Date) ? dateVal.toISOString() : (dateVal ? String(dateVal) : "");
+    return [
+      dateStr,
+      row[1],
+      row[2],
+      row[3],
+      row[4] ? String(row[4]) : ""
+    ];
+  });
+  
+  return {
+    rows: formattedData,
+    tolerancePercent: tolerance
+  };
+}

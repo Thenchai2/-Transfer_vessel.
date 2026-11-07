@@ -276,12 +276,24 @@
 
         <div class="d-flex align-items-center gap-2 flex-wrap">
           <div class="px-3 py-1 rounded bg-dark border border-secondary text-success small fw-bold d-flex align-items-center">
-            <span class="status-led"></span> <span id="comm-status">ONLINE</span>
+            <span class="status-led"></span> <span id="comm-status">ออนไลน์</span>
           </div>
           <div class="px-3 py-1 rounded bg-dark border border-secondary text-info small" id="live-clock">
             00:00:00
           </div>
-          <button class="btn btn-sm btn-primary fw-semibold" onclick="loadData()">
+          <button class="btn btn-sm btn-outline-info fw-semibold d-flex align-items-center gap-1" onclick="openToleranceModal()" title="คลิกเพื่อปรับเกณฑ์ % ผลต่าง (ซิงค์ใช้ร่วมกันทุกคน)">
+            <i class="bi bi-sliders"></i> เกณฑ์ Diff: <span id="current-tolerance-badge" class="badge bg-warning text-dark fw-bold">±1.0%</span>
+          </button>
+          <div class="d-flex align-items-center gap-1 px-2 py-1 rounded bg-dark border border-secondary">
+            <label for="auto-refresh-select" class="small fw-semibold text-light mb-0" style="font-size: 13px;"><i class="bi bi-stopwatch text-info me-1"></i>ออโต้:</label>
+            <select id="auto-refresh-select" class="form-select form-select-sm py-0 px-2 bg-transparent text-white border-0 fw-semibold" style="width: auto; font-size: 13px; cursor: pointer;" onchange="toggleAutoRefresh(this.value)">
+              <option value="0" class="bg-dark text-white">ปิด</option>
+              <option value="15" class="bg-dark text-white">15 วินาที</option>
+              <option value="30" class="bg-dark text-white" selected>30 วินาที</option>
+              <option value="60" class="bg-dark text-white">60 วินาที</option>
+            </select>
+          </div>
+          <button class="btn btn-sm btn-primary fw-semibold" onclick="loadData(false)">
             <i class="bi bi-arrow-repeat me-1"></i> รีเฟรชข้อมูล
           </button>
           <button class="btn btn-sm btn-success fw-semibold" onclick="exportToExcel()" title="ดาวน์โหลดรายงานเป็นไฟล์ Excel">
@@ -440,7 +452,7 @@
               <th style="width: 130px;">Target (kg)</th>
               <th style="width: 130px;">Actual (kg)</th>
               <th style="width: 130px;">ผลต่าง (Diff)</th>
-              <th style="width: 120px;">สถานะ</th>
+              <th style="width: 145px;">สถานะ</th>
             </tr>
           </thead>
           <tbody>
@@ -464,6 +476,49 @@
 
   </div>
 
+  <!-- Modal สำหรับตั้งค่า % ผลต่าง (Tolerance %) ซิงค์ข้อมูลกับ Google Sheet / ทุกเครื่อง -->
+  <div class="modal fade" id="toleranceModal" tabindex="-1" aria-labelledby="toleranceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content bg-dark text-white border border-secondary shadow-lg">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title fs-6 fw-bold text-info" id="toleranceModalLabel">
+            <i class="bi bi-sliders me-2"></i>ตั้งค่าเกณฑ์ % ผลต่างยอมรับได้ (Diff Tolerance)
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-light mb-3">
+            กำหนด % ผลต่าง (Diff) ที่ยอมรับได้ สำหรับจำแนกสถานะ <span class="badge bg-success-subtle text-success border border-success">อยู่ในเกณฑ์ยอมรับ</span> หรือ <span class="badge bg-danger-subtle text-danger border border-danger">เกินเกณฑ์ที่ยอมรับ</span><br>
+            <span class="text-warning"><i class="bi bi-broadcast me-1"></i><b>ระบบซิงค์ส่วนกลาง:</b> เมื่อใครเปลี่ยนค่านี้ ค่าจะบันทึกลงชีต และผู้ใช้งานคนอื่นทั้งหมดจะอัปเดตใช้ค่าเดียวกันทันที</span>
+          </p>
+          <div class="mb-3">
+            <label class="form-label text-light fw-semibold">เกณฑ์ % ผลต่างที่ยอมรับได้ (± %)</label>
+            <div class="input-group">
+              <span class="input-group-text bg-secondary text-white border-secondary">±</span>
+              <input type="number" step="0.1" min="0.1" max="50" class="form-control text-center fs-5 fw-bold text-warning bg-black border-secondary" id="input-tolerance" value="1.0">
+              <span class="input-group-text bg-secondary text-white border-secondary">%</span>
+            </div>
+            <div class="form-text text-light small mt-2">
+              ตัวอย่าง: ตั้งค่า ±1.0% หาก Target 200 kg ผลต่างยอมรับได้คือ ±2.0 kg
+            </div>
+          </div>
+          <div class="d-flex gap-2 justify-content-center">
+            <button type="button" class="btn btn-sm btn-outline-secondary text-white px-3" onclick="document.getElementById('input-tolerance').value='0.5'">0.5%</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary text-white px-3" onclick="document.getElementById('input-tolerance').value='1.0'">1.0%</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary text-white px-3" onclick="document.getElementById('input-tolerance').value='2.0'">2.0%</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary text-white px-3" onclick="document.getElementById('input-tolerance').value='5.0'">5.0%</button>
+          </div>
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="button" class="btn btn-sm btn-success fw-bold px-3" id="btn-save-tolerance" onclick="saveTolerance()">
+            <i class="bi bi-check-circle me-1"></i> บันทึกและซิงค์ทุกคน
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- โหลด Bootstrap 5 JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -479,11 +534,122 @@
     let rawData = [];
     let barChartInstance = null;
     let trendChartInstance = null;
+    let autoRefreshTimer = null;
+    let currentTolerancePercent = 1.0; // ค่าเริ่มต้นเกณฑ์ % ผลต่าง
 
     window.onload = function() {
       startLiveClock();
-      loadData();
+      loadData(false);
+      // เริ่มต้น Auto-Refresh 30 วินาทีตามค่าเริ่มต้นของ Select
+      var autoVal = document.getElementById('auto-refresh-select') ? document.getElementById('auto-refresh-select').value : '30';
+      toggleAutoRefresh(autoVal);
     };
+
+    // อัปเดตตัวเลขแสดงผลของเกณฑ์ % บน Navbar
+    function updateToleranceBadge(val) {
+      var badge = document.getElementById('current-tolerance-badge');
+      if (badge) badge.innerText = '±' + Number(val).toFixed(1) + '%';
+      var input = document.getElementById('input-tolerance');
+      if (input && document.activeElement !== input) input.value = Number(val).toFixed(1);
+    }
+
+    // เปิดหน้าต่าง Modal ตั้งค่าเกณฑ์ %
+    function openToleranceModal() {
+      var input = document.getElementById('input-tolerance');
+      if (input) input.value = currentTolerancePercent.toFixed(1);
+      var modalEl = document.getElementById('toleranceModal');
+      var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      modal.show();
+    }
+
+    // บันทึกการตั้งค่า % ผลต่างลง Google Sheet และซิงค์ทุกคน
+    function saveTolerance() {
+      var val = parseFloat(document.getElementById('input-tolerance').value);
+      if (isNaN(val) || val <= 0) {
+        alert('กรุณาระบุตัวเลขเกณฑ์ % ที่มากกว่า 0');
+        return;
+      }
+
+      var btn = document.getElementById('btn-save-tolerance');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> กำลังบันทึก...';
+
+      var url = getWebAppUrl();
+      var sep = url.indexOf('?') > -1 ? '&' : '?';
+      var saveUrl = url + sep + 'action=setTolerance&val=' + encodeURIComponent(val);
+
+      fetch(saveUrl)
+        .then(function(res) {
+          if (!res.ok) throw new Error('HTTP Status ' + res.status);
+          return res.json();
+        })
+        .then(function(res) {
+          finishSave(val);
+        })
+        .catch(function(err) {
+          saveToleranceJsonp(saveUrl, val, finishSave, function(e) {
+            alert('เกิดข้อผิดพลาดในการบันทึก: ' + e);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> บันทึกและซิงค์ทุกคน';
+          });
+        });
+
+      function finishSave(newVal) {
+        currentTolerancePercent = newVal;
+        updateToleranceBadge(newVal);
+        var modalEl = document.getElementById('toleranceModal');
+        var modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> บันทึกและซิงค์ทุกคน';
+        filterData(); // คำนวณสีและสถานะตารางใหม่ทันทีด้วยเกณฑ์ใหม่
+      }
+    }
+
+    function saveToleranceJsonp(url, val, onSuccessCb, onErrorCb) {
+      var callbackName = 'gasToleranceCallback_' + Math.round(100000 * Math.random());
+      var script = document.createElement('script');
+      var sep = url.indexOf('?') > -1 ? '&' : '?';
+      script.src = url + sep + 'callback=' + callbackName;
+
+      var timer = setTimeout(function() {
+        cleanup();
+        onErrorCb('หมดเวลาเชื่อมต่อ (Timeout)');
+      }, 10000);
+
+      window[callbackName] = function(res) {
+        clearTimeout(timer);
+        cleanup();
+        onSuccessCb(val);
+      };
+
+      function cleanup() {
+        if (script.parentNode) script.parentNode.removeChild(script);
+        delete window[callbackName];
+      }
+
+      script.onerror = function() {
+        clearTimeout(timer);
+        cleanup();
+        onErrorCb('Network Script Error');
+      };
+
+      document.body.appendChild(script);
+    }
+
+    // ระบบรีเฟรชข้อมูลอัตโนมัติ (SCADA Auto-Sync)
+    function toggleAutoRefresh(seconds) {
+      if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer);
+        autoRefreshTimer = null;
+      }
+      var sec = parseInt(seconds, 10);
+      if (sec > 0) {
+        autoRefreshTimer = setInterval(function() {
+          loadData(true); // รีเฟรชแบบเงียบ (Silent background update)
+        }, sec * 1000);
+      }
+    }
 
     // นาฬิกาดิจิทัล
     function startLiveClock() {
@@ -499,13 +665,16 @@
     }
 
     // ฟังก์ชันดึงข้อมูลจาก API ระบบ
-    function loadData() {
-      document.getElementById('comm-status').innerText = 'SYNCING...';
+    function loadData(isSilent) {
+      document.getElementById('comm-status').innerText = 'กำลังซิงค์...';
       document.getElementById('comm-status').className = 'text-warning';
 
-      document.querySelector('#detail-table tbody').innerHTML = '<tr><td colspan="8" class="text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div>กำลังซิงค์ข้อมูลระบบ (Synchronizing System Data)...</td></tr>';
-      document.querySelector('#summary-table tbody').innerHTML = '<tr><td colspan="7" class="text-center py-3 text-light">กำลังประมวลผลสรุปยอดการใช้งาน...</td></tr>';
-      document.getElementById('latest-cards-container').innerHTML = '<div class="col-12 text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังซิงค์สถานะสถานีตาชั่ง (Station Mimic)...</div>';
+      // ถ้าเป็นการกดโหลดครั้งแรก หรือกดปุ่มรีเฟรชเอง ให้แสดงตัวหมุนโหลดข้อมูล
+      if (!isSilent || !rawData || rawData.length === 0) {
+        document.querySelector('#detail-table tbody').innerHTML = '<tr><td colspan="8" class="text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div>กำลังซิงค์ข้อมูลระบบ (Synchronizing System Data)...</td></tr>';
+        document.querySelector('#summary-table tbody').innerHTML = '<tr><td colspan="7" class="text-center py-3 text-light">กำลังประมวลผลสรุปยอดการใช้งาน...</td></tr>';
+        document.getElementById('latest-cards-container').innerHTML = '<div class="col-12 text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังซิงค์สถานะสถานีตาชั่ง (Station Mimic)...</div>';
+      }
 
       var url = getWebAppUrl();
 
@@ -554,18 +723,29 @@
     }
 
     function onSuccess(data) {
-      document.getElementById('comm-status').innerText = 'ONLINE';
+      document.getElementById('comm-status').innerText = 'ออนไลน์';
       document.getElementById('comm-status').className = 'text-success';
       document.getElementById('last-update-time').innerText = 'อัปเดต: ' + new Date().toLocaleTimeString('th-TH');
 
-      if (!data || !Array.isArray(data) || data.length <= 1) {
+      var rows = [];
+      if (Array.isArray(data)) {
+        rows = data;
+      } else if (data && typeof data === 'object') {
+        if (data.tolerancePercent !== undefined) {
+          currentTolerancePercent = parseFloat(data.tolerancePercent) || 1.0;
+          updateToleranceBadge(currentTolerancePercent);
+        }
+        rows = Array.isArray(data.rows) ? data.rows : [];
+      }
+
+      if (!rows || rows.length <= 1) {
         document.querySelector('#detail-table tbody').innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">ยังไม่มีข้อมูลในชีต</td></tr>';
         document.querySelector('#summary-table tbody').innerHTML = '<tr><td colspan="7" class="text-center py-3 text-muted">ยังไม่มีข้อมูล</td></tr>';
         document.getElementById('latest-cards-container').innerHTML = '<div class="col-12 text-center py-3 text-muted">ยังไม่มีข้อมูลการชั่งในระบบ</div>';
         return;
       }
 
-      rawData = data.slice(1);
+      rawData = rows.slice(1);
 
       // สร้างการ์ดแสดงการใช้งานล่าสุดของแต่ละตาชั่ง (SCADA Mimic Cards)
       renderLatestCards(rawData);
@@ -578,11 +758,11 @@
     }
 
     function onError(error) {
-      document.getElementById('comm-status').innerText = 'OFFLINE';
+      document.getElementById('comm-status').innerText = 'ออฟไลน์';
       document.getElementById('comm-status').className = 'text-danger';
       var msg = error && error.message ? error.message : String(error);
       document.querySelector('#detail-table tbody').innerHTML = 
-        '<tr><td colspan="9" class="text-center py-4 text-danger">' +
+        '<tr><td colspan="8" class="text-center py-4 text-danger">' +
         'เกิดข้อผิดพลาดในการดึงข้อมูล: ' + msg + '<br>' +
         '<small class="text-light">กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตหรือสถานะเซิร์ฟเวอร์ระบบ</small>' +
         '</td></tr>';
@@ -659,8 +839,11 @@
         if (!isNaN(targetNum) && !isNaN(actualNum)) {
           var diff = actualNum - targetNum;
           var sign = diff > 0 ? '+' : '';
-          var diffColor = Math.abs(diff) <= 0.5 ? '#10b981' : (diff > 0 ? '#ef4444' : '#f59e0b');
-          diffHtml = '<span style="color:' + diffColor + '; font-weight: bold;">' + sign + diff.toFixed(2) + ' kg</span>';
+          var diffPct = targetNum > 0 ? (Math.abs(diff) / targetNum) * 100 : 0;
+          var isNormal = targetNum > 0 ? (diffPct <= currentTolerancePercent) : (Math.abs(diff) <= 0.5);
+          var diffColor = isNormal ? '#10b981' : (diff > 0 ? '#ef4444' : '#f59e0b');
+          var pctText = targetNum > 0 ? ' (' + (diff > 0 ? '+' : '') + diffPct.toFixed(1) + '%)' : '';
+          diffHtml = '<span style="color:' + diffColor + '; font-weight: bold;">' + sign + diff.toFixed(2) + ' kg' + pctText + '</span>';
 
           if (targetNum > 0) {
             percent = Math.min(100, Math.max(0, (actualNum / targetNum) * 100));
@@ -703,9 +886,10 @@
         html += '    </div>';
 
         // Footer: Resulting & Diff
+        var statusTag = (!isNaN(targetNum) && !isNaN(actualNum)) ? (isNormal ? '<span class="badge bg-success-subtle text-success border border-success py-0 px-1 ms-1">อยู่ในเกณฑ์ยอมรับ</span>' : '<span class="badge bg-danger-subtle text-danger border border-danger py-0 px-1 ms-1">เกินเกณฑ์ที่ยอมรับ</span>') : '';
         html += '    <div class="d-flex justify-content-between small pt-2 border-top border-secondary mt-2 text-white">';
         html += '      <span style="color: #cbd5e1;">Resulting: <b class="text-white">' + (item.resulting !== undefined && item.resulting !== "" ? item.resulting : '-') + '</b></span>';
-        html += '      <span>ผลต่าง: ' + diffHtml + '</span>';
+        html += '      <span>ผลต่าง: ' + diffHtml + statusTag + '</span>';
         html += '    </div>';
 
         html += '  </div>';
@@ -1051,19 +1235,21 @@
         var target = parseFloat(r[1]);
         var actual = parseFloat(r[3]);
         var diffHtml = '<span class="text-muted">-</span>';
-        var statusBadge = '<span class="badge bg-secondary">UNKNOWN</span>';
+        var statusBadge = '<span class="badge bg-secondary">ไม่ระบุ</span>';
 
         if (!isNaN(target) && !isNaN(actual)) {
           var diff = actual - target;
           var sign = diff > 0 ? '+' : '';
-          var isNormal = Math.abs(diff) <= 0.5;
+          var diffPct = target > 0 ? (Math.abs(diff) / target) * 100 : 0;
+          var isNormal = target > 0 ? (diffPct <= currentTolerancePercent) : (Math.abs(diff) <= 0.5);
           var diffColor = isNormal ? '#10b981' : (diff > 0 ? '#ef4444' : '#38bdf8');
-          diffHtml = '<span style="color:' + diffColor + '; font-weight:bold;">' + sign + diff.toFixed(2) + '</span>';
+          var pctStr = target > 0 ? ' <small style="font-size:11px; opacity:0.85;">(' + (diff > 0 ? '+' : '') + diffPct.toFixed(1) + '%)</small>' : '';
+          diffHtml = '<span style="color:' + diffColor + '; font-weight:bold;">' + sign + diff.toFixed(2) + pctStr + '</span>';
 
           if (isNormal) {
-            statusBadge = '<span class="badge bg-success-subtle text-success border border-success">NORMAL</span>';
+            statusBadge = '<span class="badge bg-success-subtle text-success border border-success" title="อยู่ในเกณฑ์ ±' + currentTolerancePercent.toFixed(1) + '%">อยู่ในเกณฑ์ยอมรับ</span>';
           } else {
-            statusBadge = '<span class="badge bg-danger-subtle text-danger border border-danger">DEVIATION</span>';
+            statusBadge = '<span class="badge bg-danger-subtle text-danger border border-danger" title="เกินเกณฑ์ ±' + currentTolerancePercent.toFixed(1) + '%">เกินเกณฑ์ที่ยอมรับ</span>';
           }
         }
 
@@ -1175,9 +1361,26 @@
 
     function parseDateSafe(val) {
       if (!val) return null;
-      var cleanVal = String(val).replace(/\s*\(.*?\)/, '');
+      if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+      var cleanVal = String(val).trim().replace(/\s*\(.*?\)/, '');
+      
+      // ลองแปลงรูปแบบมาตรฐาน ISO หรือ Date string ปกติ
       var d = new Date(cleanVal);
       if (d instanceof Date && !isNaN(d.getTime())) return d;
+      
+      // รองรับกรณีรูปแบบวันที่ DD/MM/YYYY หรือ DD-MM-YYYY (เช่น 07/11/2026 หรือ 7/11/2026 08:30:00)
+      var dmyMatch = cleanVal.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+      if (dmyMatch) {
+        var day = parseInt(dmyMatch[1], 10);
+        var month = parseInt(dmyMatch[2], 10) - 1;
+        var year = parseInt(dmyMatch[3], 10);
+        var hour = parseInt(dmyMatch[4] || 0, 10);
+        var min = parseInt(dmyMatch[5] || 0, 10);
+        var sec = parseInt(dmyMatch[6] || 0, 10);
+        var parsed = new Date(year, month, day, hour, min, sec);
+        if (!isNaN(parsed.getTime())) return parsed;
+      }
+      
       var dOrig = new Date(val);
       return (dOrig instanceof Date && !isNaN(dOrig.getTime())) ? dOrig : null;
     }
@@ -1211,6 +1414,7 @@
       var summaryData = [
         ['รายงานสรุปยอดการใช้งานเคมี (PP CHEMICAL DOSING SYSTEM)'],
         ['เงื่อนไข: ' + document.getElementById('filter-status').innerText],
+        ['เกณฑ์ผลต่างยอมรับได้: ±' + currentTolerancePercent.toFixed(1) + '%'],
         ['วันที่ออกรายงาน: ' + new Date().toLocaleString('th-TH')],
         [],
         ['ลำดับ', 'ชื่อสารเคมี', 'จำนวนรอบ (ครั้ง)', 'เป้าหมายรวม (kg)', 'ใช้งานจริงรวม (kg)', 'ผลต่าง (kg)', 'เฉลี่ยต่อรอบ (kg/ครั้ง)']
@@ -1252,7 +1456,8 @@
         var target = parseFloat(r[1]);
         var actual = parseFloat(r[3]);
         var diffVal = (!isNaN(target) && !isNaN(actual)) ? (actual - target) : '';
-        var isNormal = Math.abs(diffVal) <= 0.5;
+        var diffPct = (target > 0 && diffVal !== '') ? (Math.abs(diffVal) / target * 100) : 0;
+        var isNormal = target > 0 ? (diffPct <= currentTolerancePercent) : (Math.abs(diffVal) <= 0.5);
 
         detailData.push([
           index + 1,
@@ -1261,14 +1466,14 @@
           scaleInfo.mode,
           !isNaN(target) ? target : (r[1] || ''),
           !isNaN(actual) ? actual : (r[3] || ''),
-          diffVal !== '' ? Number(diffVal.toFixed(2)) : '',
-          diffVal !== '' ? (isNormal ? 'NORMAL' : 'DEVIATION') : 'UNKNOWN'
+          diffVal !== '' ? (Number(diffVal.toFixed(2)) + (target > 0 ? ' (' + (diffVal > 0 ? '+' : '') + diffPct.toFixed(1) + '%)' : '')) : '',
+          diffVal !== '' ? (isNormal ? 'อยู่ในเกณฑ์ยอมรับ' : 'เกินเกณฑ์ที่ยอมรับ') : 'ไม่ระบุ'
         ]);
       });
 
       var wsDetail = XLSX.utils.aoa_to_sheet(detailData);
       wsDetail['!cols'] = [
-        { wch: 8 }, { wch: 22 }, { wch: 24 }, { wch: 15 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 14 }
+        { wch: 8 }, { wch: 22 }, { wch: 24 }, { wch: 15 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 20 }
       ];
       XLSX.utils.book_append_sheet(wb, wsDetail, 'ประวัติการชั่งละเอียด');
 
