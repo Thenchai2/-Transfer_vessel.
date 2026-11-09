@@ -1127,8 +1127,8 @@
       sample.forEach(function(r) {
         var d = parseDateSafe(r[0]);
         labels.push(d ? formatTime(d) : String(r[0] || ''));
-        targetData.push(parseFloat(r[1]) || 0);
-        actualData.push(parseFloat(r[3]) || parseFloat(r[2]) || 0);
+        targetData.push(parseCleanNum(r[1]) || 0);
+        actualData.push((!isNaN(parseCleanNum(r[3]))) ? parseCleanNum(r[3]) : (parseCleanNum(r[2]) || 0));
       });
 
       if (trendChartInstance) trendChartInstance.destroy();
@@ -1233,8 +1233,8 @@
         var dateStr = dateObj ? formatDateTime(dateObj) : (r[0] || '-');
         var scaleInfo = parseScaleInfo(r[4]);
 
-        var target = parseFloat(r[1]);
-        var actual = (!isNaN(parseFloat(r[3]))) ? parseFloat(r[3]) : parseFloat(r[2]);
+        var target = parseCleanNum(r[1]);
+        var actual = (!isNaN(parseCleanNum(r[3]))) ? parseCleanNum(r[3]) : parseCleanNum(r[2]);
         var diffHtml = '<span class="text-muted">-</span>';
         var statusBadge = '<span class="badge bg-secondary">ไม่ระบุ</span>';
 
@@ -1463,8 +1463,8 @@
         var dateStr = dateObj ? formatDateTime(dateObj) : (r[0] || '-');
         var scaleInfo = parseScaleInfo(r[4]);
 
-        var target = parseFloat(r[1]);
-        var actual = (!isNaN(parseFloat(r[3]))) ? parseFloat(r[3]) : (!isNaN(parseFloat(r[2])) ? parseFloat(r[2]) : NaN);
+        var target = parseCleanNum(r[1]);
+        var actual = (!isNaN(parseCleanNum(r[3]))) ? parseCleanNum(r[3]) : (!isNaN(parseCleanNum(r[2])) ? parseCleanNum(r[2]) : NaN);
         var diffVal = (!isNaN(target) && !isNaN(actual)) ? (actual - target) : '';
         var diffPct = (target > 0 && diffVal !== '') ? (Math.abs(diffVal) / target * 100) : 0;
         var isNormal = target > 0 ? (diffPct <= currentTolerancePercent) : (Math.abs(diffVal) <= 0.5);
