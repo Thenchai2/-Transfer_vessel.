@@ -20,7 +20,6 @@ function doPost(e) {
   // ------------------------------------------
 
   // เรียกใช้ฟังก์ชันสร้างชีตหลักที่จะรวมข้อมูลทั้งหมด
-  // รับค่าจาก HMI
   var mainSheet = getOrCreateSheet("รวมข้อมูลตาชั่ง");
   
   var data = JSON.parse(e.postData.contents);
@@ -42,49 +41,41 @@ function doPost(e) {
   var d5064 = data.D5064;
 
   // 4. ดึงข้อมูล Mode Timer  CAUSTIC SODA 50%
-  var d5072 = data.D5072; // Target
-  var d150 = (data.D150 !== undefined) ? "'" + data.D150 : undefined; // Resulting
-
-  // 5. ดึงข้อมูล Mode Weight  CAUSTIC SODA 50%
-  var d5108 = data.D5108; // Target
-  var d178 = (data.D178 !== undefined) ? "'" + data.D178 : undefined; // Resulting
-
-  // ตาชั่ง CAUSTIC SODA 50% ใช้หัวชั่งตัวเดียวกัน ทั้ง Mode Timer และ Mode Weight จึงรับค่าน้ำหนักจริง (Actual weight) จาก D5076 ตัวเดียวกัน
+  var d5072 = data.D5072;
+  var d150 = (data.D150 !== undefined) ? "'" + data.D150 : undefined; 
   var d5076 = data.D5076;
 
-  // --- ฟังก์ชันตรวจสอบว่าตาชั่งตัวนั้นมีคำสั่งทำงานจริงหรือไม่ ---
-  // ป้องกันการบันทึกมั่ว: กรองค่า 0, null, undefined ออก เพื่อให้บันทึกเฉพาะตาชั่งที่ทำงานรอบนั้นเท่านั้น
-  function isScaleActive(target, resulting, actual) {
-    var t = parseFloat(target);
-    var r = parseFloat(resulting);
-    var a = parseFloat(actual);
-    return (!isNaN(t) && t > 0) || (!isNaN(r) && r > 0) || (!isNaN(a) && a > 0);
-  }
+  // 5. ดึงข้อมูล "Mode Weight  CAUSTIC SODA 50%"
+  var d5108 = data.D5108;
+  var d178 = (data.D178 !== undefined) ? "'" + data.D178 : undefined; 
+  // ดึง D5076_weight ตามที่ HMI ส่งมา (และสำรอง D5076 ไว้ด้วย)
+  var d5076_weight = (data.D5076_weight !== undefined && data.D5076_weight !== "") ? data.D5076_weight : data.D5076;
 
   // --- บันทึกข้อมูลลงชีตเดียว และเพิ่มชื่อตาชั่งต่อท้าย ---
 
   // 1. ข้อมูล "Mode Timer  LS9"
-  if (isScaleActive(d5032, data.D102, d5040)) {
+  if (d5032 !== undefined || data.D102 !== undefined || d5040 !== undefined) {
     mainSheet.appendRow([timestamp, d5032, d102, d5040, "Mode Timer  LS9"]);
   }
 
   // 2. ข้อมูล "Mode Timer  UD1"
-  if (isScaleActive(d5048, data.D118, d5052)) {
+  if (d5048 !== undefined || data.D118 !== undefined || d5052 !== undefined) {
     mainSheet.appendRow([timestamp, d5048, d118, d5052, "Mode Timer  UD1"]); 
   }
 
   // 3. ข้อมูล "Mode Timer  LAS"
-  if (isScaleActive(d5060, data.D134, d5064)) {
+  if (d5060 !== undefined || data.D134 !== undefined || d5064 !== undefined) {
     mainSheet.appendRow([timestamp, d5060, d134, d5064, "Mode Timer  LAS"]); 
   }
 
-  // 4 & 5. ข้อมูล CAUSTIC SODA 50% (PLC Interlock: เลือกระหว่าง Mode Weight หรือ Mode Timer อย่างใดอย่างหนึ่งเท่านั้น)
-  if (isScaleActive(d5108, data.D178, undefined)) {
-    // ถ้าเลือก Mode Weight (Target D5108 หรือ Resulting D178 มีค่า)
-    mainSheet.appendRow([timestamp, d5108, d178, d5076, "Mode Weight  CAUSTIC SODA 50%"]); 
-  } else if (isScaleActive(d5072, data.D150, undefined)) {
-    // ถ้าเลือก Mode Timer (Target D5072 หรือ Resulting D150 มีค่า)
+  // 4. ข้อมูล "Mode Timer  CAUSTIC SODA 50%" 
+  if (d5072 !== undefined || data.D150 !== undefined || d5076 !== undefined) {
     mainSheet.appendRow([timestamp, d5072, d150, d5076, "Mode Timer  CAUSTIC SODA 50%"]); 
+  }
+
+  // 5. ข้อมูล "Mode Weight  CAUSTIC SODA 50%"
+  if (d5108 !== undefined || data.D178 !== undefined || d5076_weight !== undefined) {
+    mainSheet.appendRow([timestamp, d5108, d178, d5076_weight, "Mode Weight  CAUSTIC SODA 50%"]); 
   }
 
   return ContentService.createTextOutput(JSON.stringify({
@@ -132,9 +123,9 @@ function simulateHMI() {
   // 2. จำลองข้อมูล JSON ที่จอ HMI จะส่งมา (แก้ตัวเลขเพื่อทดสอบได้เลย)
   var testData = {
     // ตัวอย่าง: จำลองส่งข้อมูลของ Mode Weight CAUSTIC SODA 50%
-    "D5108": 200,      // Target weight
-    "D178": 199.5,     // Resulting weight
-    "D5076": 199.5     // Actual weight จากตาชั่ง (D5076 ตัวเดียวกัน)
+    "D5108": 200,             // Target weight
+    "D178": 199.5,            // Resulting weight
+    "D5076_weight": 199.5     // Actual weight ของโหมด Weight (ส่งเป็น D5076_weight)
   };
   
   var options = {

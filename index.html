@@ -831,8 +831,8 @@
         var dateObj = parseDateSafe(item.timestamp);
         var dateStr = dateObj ? formatDateTime(dateObj) : (item.timestamp || '-');
 
-        var targetNum = parseFloat(item.target);
-        var actualNum = parseFloat(item.actual);
+        var targetNum = parseCleanNum(item.target);
+        var actualNum = (!isNaN(parseCleanNum(item.actual))) ? parseCleanNum(item.actual) : parseCleanNum(item.resulting);
         var diffHtml = '<span class="text-muted">-</span>';
         var percent = 0;
 
@@ -868,10 +868,11 @@
         html += '          <div class="readout-value">' + (item.target !== undefined && item.target !== "" ? item.target : '-') + ' <small class="fs-6 fw-normal">kg</small></div>';
         html += '        </div>';
         html += '      </div>';
+        var actualDisp = (item.actual !== undefined && item.actual !== "") ? item.actual : (item.resulting !== undefined && item.resulting !== "" ? item.resulting : '-');
         html += '      <div class="col-6">';
         html += '        <div class="readout-box readout-actual">';
         html += '          <div class="readout-label">ACTUAL (PV)</div>';
-        html += '          <div class="readout-value">' + (item.actual !== undefined && item.actual !== "" ? item.actual : '-') + ' <small class="fs-6 fw-normal">kg</small></div>';
+        html += '          <div class="readout-value">' + actualDisp + ' <small class="fs-6 fw-normal">kg</small></div>';
         html += '        </div>';
         html += '      </div>';
         html += '    </div>';
@@ -999,8 +1000,8 @@
         var info = parseScaleInfo(r[4]);
         // ถ้าไม่ได้เลือกโหมด ให้จัดกลุ่มตามชื่อสารเคมีเป็นหลัก (รวมโหมด Weight และ Timer เข้าด้วยกัน)
         var key = info.chemical;
-        var target = parseFloat(r[1]) || 0;
-        var actual = parseFloat(r[3]) || 0;
+        var target = parseCleanNum(r[1]) || 0;
+        var actual = (!isNaN(parseCleanNum(r[3]))) ? parseCleanNum(r[3]) : (parseCleanNum(r[2]) || 0);
 
         if (!chemMap[key]) {
           chemMap[key] = {
@@ -1127,7 +1128,7 @@
         var d = parseDateSafe(r[0]);
         labels.push(d ? formatTime(d) : String(r[0] || ''));
         targetData.push(parseFloat(r[1]) || 0);
-        actualData.push(parseFloat(r[3]) || 0);
+        actualData.push(parseFloat(r[3]) || parseFloat(r[2]) || 0);
       });
 
       if (trendChartInstance) trendChartInstance.destroy();
@@ -1233,7 +1234,7 @@
         var scaleInfo = parseScaleInfo(r[4]);
 
         var target = parseFloat(r[1]);
-        var actual = parseFloat(r[3]);
+        var actual = (!isNaN(parseFloat(r[3]))) ? parseFloat(r[3]) : parseFloat(r[2]);
         var diffHtml = '<span class="text-muted">-</span>';
         var statusBadge = '<span class="badge bg-secondary">ไม่ระบุ</span>';
 
@@ -1254,6 +1255,7 @@
         }
 
         var modeBadgeClass = scaleInfo.mode === 'Mode Weight' ? 'bg-success text-white' : 'bg-primary text-white';
+        var actualDisplay = (r[3] !== undefined && r[3] !== "") ? r[3] : (r[2] !== undefined && r[2] !== "" ? r[2] : '-');
 
         html += '<tr>';
         html += '<td class="col-idx">' + rowNum + '</td>';
@@ -1261,7 +1263,7 @@
         html += '<td class="text-start ps-3 fw-bold text-white">🧪 ' + scaleInfo.chemical + '</td>';
         html += '<td><span class="badge ' + modeBadgeClass + ' small px-2 py-1">' + scaleInfo.mode + '</span></td>';
         html += '<td class="text-num fw-bold" style="color: #ff9800 !important;">' + (r[1] !== undefined && r[1] !== "" ? r[1] : '-') + '</td>';
-        html += '<td class="text-num fw-bold" style="color: #00e676 !important;">' + (r[3] !== undefined && r[3] !== "" ? r[3] : '-') + '</td>';
+        html += '<td class="text-num fw-bold" style="color: #00e676 !important;">' + actualDisplay + '</td>';
         html += '<td class="text-num fw-bold">' + diffHtml + '</td>';
         html += '<td>' + statusBadge + '</td>';
         html += '</tr>';
@@ -1359,17 +1361,21 @@
       return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
     }
 
+    // ฟังก์ชันแปลงตัวเลขอย่างปลอดภัย (ตัดเครื่องหมาย ' หรือ , ที่ Google Sheets มักใส่มา)
+    function parseCleanNum(val) {
+      if (val === undefined || val === null || val === '') return NaN;
+      var s = String(val).replace(/^['"\s]+/, '').replace(/,/g, '').trim();
+      var n = parseFloat(s);
+      return isNaN(n) ? NaN : n;
+    }
+
     function parseDateSafe(val) {
       if (!val) return null;
       if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
       var cleanVal = String(val).trim().replace(/\s*\(.*?\)/, '');
       
-      // ลองแปลงรูปแบบมาตรฐาน ISO หรือ Date string ปกติ
-      var d = new Date(cleanVal);
-      if (d instanceof Date && !isNaN(d.getTime())) return d;
-      
-      // รองรับกรณีรูปแบบวันที่ DD/MM/YYYY หรือ DD-MM-YYYY (เช่น 07/11/2026 หรือ 7/11/2026 08:30:00)
-      var dmyMatch = cleanVal.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:\s+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+      // 1. ตรวจสอบรูปแบบ DD/MM/YYYY หรือ D/M/YYYY (แบบไทย/สากล) ก่อน เพื่อไม่ให้เบราว์เซอร์สลับวันกับเดือนเป็นแบบ US
+      var dmyMatch = cleanVal.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[,\s]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
       if (dmyMatch) {
         var day = parseInt(dmyMatch[1], 10);
         var month = parseInt(dmyMatch[2], 10) - 1;
@@ -1380,6 +1386,10 @@
         var parsed = new Date(year, month, day, hour, min, sec);
         if (!isNaN(parsed.getTime())) return parsed;
       }
+
+      // 2. ถ้าเป็นรูปแบบมาตรฐาน ISO เช่น 2026-11-09T03:18:25.000Z
+      var d = new Date(cleanVal);
+      if (d instanceof Date && !isNaN(d.getTime())) return d;
       
       var dOrig = new Date(val);
       return (dOrig instanceof Date && !isNaN(dOrig.getTime())) ? dOrig : null;
@@ -1454,7 +1464,7 @@
         var scaleInfo = parseScaleInfo(r[4]);
 
         var target = parseFloat(r[1]);
-        var actual = parseFloat(r[3]);
+        var actual = (!isNaN(parseFloat(r[3]))) ? parseFloat(r[3]) : (!isNaN(parseFloat(r[2])) ? parseFloat(r[2]) : NaN);
         var diffVal = (!isNaN(target) && !isNaN(actual)) ? (actual - target) : '';
         var diffPct = (target > 0 && diffVal !== '') ? (Math.abs(diffVal) / target * 100) : 0;
         var isNormal = target > 0 ? (diffPct <= currentTolerancePercent) : (Math.abs(diffVal) <= 0.5);
@@ -1465,7 +1475,7 @@
           scaleInfo.chemical,
           scaleInfo.mode,
           !isNaN(target) ? target : (r[1] || ''),
-          !isNaN(actual) ? actual : (r[3] || ''),
+          !isNaN(actual) ? actual : (r[3] || r[2] || ''),
           diffVal !== '' ? (Number(diffVal.toFixed(2)) + (target > 0 ? ' (' + (diffVal > 0 ? '+' : '') + diffPct.toFixed(1) + '%)' : '')) : '',
           diffVal !== '' ? (isNormal ? 'อยู่ในเกณฑ์ยอมรับ' : 'เกินเกณฑ์ที่ยอมรับ') : 'ไม่ระบุ'
         ]);
