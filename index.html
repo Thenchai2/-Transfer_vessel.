@@ -1479,11 +1479,11 @@
         var dateStr = dateObj ? formatDateTime(dateObj) : (item.timestamp || '-');
 
         var targetNum = parseCleanNum(item.target);
-        var actualNum = (!isNaN(parseCleanNum(item.actual))) ? parseCleanNum(item.actual) : parseCleanNum(item.resulting);
+        var actualNum = getEffectiveActualWeight(item.actual, item.resulting);
         var diffHtml = '<span class="text-muted">-</span>';
         var percent = 0;
 
-        if (!isNaN(targetNum) && !isNaN(actualNum)) {
+        if (!isNaN(targetNum)) {
           var diff = actualNum - targetNum;
           var sign = diff > 0 ? '+' : '';
           var diffPct = targetNum > 0 ? (Math.abs(diff) / targetNum) * 100 : 0;
@@ -1515,7 +1515,7 @@
         html += '          <div class="readout-value">' + (item.target !== undefined && item.target !== "" ? item.target : '-') + ' <small class="fs-6 fw-normal">kg</small></div>';
         html += '        </div>';
         html += '      </div>';
-        var actualDisp = (item.actual !== undefined && item.actual !== "") ? item.actual : (item.resulting !== undefined && item.resulting !== "" ? item.resulting : '-');
+        var actualDisp = getEffectiveActualDisplay(item.actual, item.resulting);
         html += '      <div class="col-6">';
         html += '        <div class="readout-box readout-actual">';
         html += '          <div class="readout-label">ACTUAL (PV)</div>';
@@ -1648,7 +1648,7 @@
         // ถ้าไม่ได้เลือกโหมด ให้จัดกลุ่มตามชื่อสารเคมีเป็นหลัก (รวมโหมด Weight และ Timer เข้าด้วยกัน)
         var key = info.chemical;
         var target = parseCleanNum(r[1]) || 0;
-        var actual = (!isNaN(parseCleanNum(r[3]))) ? parseCleanNum(r[3]) : (parseCleanNum(r[2]) || 0);
+        var actual = getEffectiveActualWeight(r[3], r[2]);
 
         if (!chemMap[key]) {
           chemMap[key] = {
@@ -1913,7 +1913,7 @@
         var d = parseDateSafe(r[0]);
         labels.push(d ? formatTime(d) : String(r[0] || ''));
         targetData.push(parseCleanNum(r[1]) || 0);
-        actualData.push((!isNaN(parseCleanNum(r[3]))) ? parseCleanNum(r[3]) : (parseCleanNum(r[2]) || 0));
+        actualData.push(getEffectiveActualWeight(r[3], r[2]));
       });
 
       if (trendChartInstance) trendChartInstance.destroy();
@@ -2019,7 +2019,7 @@
         var scaleInfo = parseScaleInfo(r[4]);
 
         var target = parseCleanNum(r[1]);
-        var actual = (!isNaN(parseCleanNum(r[3]))) ? parseCleanNum(r[3]) : parseCleanNum(r[2]);
+        var actual = getEffectiveActualWeight(r[3], r[2]);
         var diffHtml = '<span class="text-muted">-</span>';
         var statusBadge = '<span class="badge bg-secondary">ไม่ระบุ</span>';
 
@@ -2040,7 +2040,7 @@
         }
 
         var modeBadgeClass = scaleInfo.mode === 'Mode Weight' ? 'bg-success text-white' : 'bg-primary text-white';
-        var actualDisplay = (r[3] !== undefined && r[3] !== "") ? r[3] : (r[2] !== undefined && r[2] !== "" ? r[2] : '-');
+        var actualDisplay = getEffectiveActualDisplay(r[3], r[2]);
 
         html += '<tr>';
         html += '<td class="col-idx">' + rowNum + '</td>';
@@ -2154,6 +2154,34 @@
       return isNaN(n) ? NaN : n;
     }
 
+    // ฟังก์ชันคำนวณค่าน้ำหนัก Actual weight (ถ้าไม่มีข้อมูลช่อง Actual weight หรือเป็น 0 ให้เอา Resulting weight มาใช้ ถ้าทั้งสองช่องไม่มีหรือเป็น 0 ให้เป็น 0)
+    function getEffectiveActualWeight(actualRaw, resultingRaw) {
+      var a = parseCleanNum(actualRaw);
+      var r = parseCleanNum(resultingRaw);
+
+      if (!isNaN(a) && a !== 0) {
+        return a;
+      }
+      if (!isNaN(r) && r !== 0) {
+        return r;
+      }
+      return 0;
+    }
+
+    // ฟังก์ชันแสดงผลค่าน้ำหนัก Actual weight ในตาราง/หน้าปัด
+    function getEffectiveActualDisplay(actualRaw, resultingRaw) {
+      var a = parseCleanNum(actualRaw);
+      var r = parseCleanNum(resultingRaw);
+
+      if (!isNaN(a) && a !== 0) {
+        return String(actualRaw).replace(/^['"\s]+/, '').trim();
+      }
+      if (!isNaN(r) && r !== 0) {
+        return String(resultingRaw).replace(/^['"\s]+/, '').trim();
+      }
+      return '0';
+    }
+
     function parseDateSafe(val) {
       if (!val) return null;
       if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
@@ -2256,7 +2284,8 @@
         var scaleInfo = parseScaleInfo(r[4]);
 
         var target = parseCleanNum(r[1]);
-        var actual = (!isNaN(parseCleanNum(r[3]))) ? parseCleanNum(r[3]) : (!isNaN(parseCleanNum(r[2])) ? parseCleanNum(r[2]) : NaN);
+        var actual = getEffectiveActualWeight(r[3], r[2]);
+        var actualDisplay = getEffectiveActualDisplay(r[3], r[2]);
         var diffVal = (!isNaN(target) && !isNaN(actual)) ? (actual - target) : '';
         var diffPct = (target > 0 && diffVal !== '') ? (Math.abs(diffVal) / target * 100) : 0;
         var isNormal = target > 0 ? (diffPct <= currentTolerancePercent) : (Math.abs(diffVal) <= 0.5);
@@ -2267,7 +2296,7 @@
           scaleInfo.chemical,
           scaleInfo.mode,
           !isNaN(target) ? target : (r[1] || ''),
-          !isNaN(actual) ? actual : (r[3] || r[2] || ''),
+          actual !== 0 ? actual : actualDisplay,
           diffVal !== '' ? (Number(diffVal.toFixed(2)) + (target > 0 ? ' (' + (diffVal > 0 ? '+' : '') + diffPct.toFixed(1) + '%)' : '')) : '',
           diffVal !== '' ? (isNormal ? 'อยู่ในเกณฑ์ยอมรับ' : 'เกินเกณฑ์ที่ยอมรับ') : 'ไม่ระบุ'
         ]);
