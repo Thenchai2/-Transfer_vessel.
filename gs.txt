@@ -1,347 +1,222 @@
-// ฟังก์ชันสำหรับเตรียมความพร้อม: สร้างชีต สร้างหัวตาราง และตั้งค่าฟอร์แมตป้องกัน 0 หายอัตโนมัติ
-function setupEnvironment() {
+function doPost(e) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   
-  // === 1. จัดการชีต Parts (คลังอะไหล่) ===
-  var sheetParts = ss.getSheetByName("Parts");
-  if (!sheetParts) {
-    sheetParts = ss.getSheets()[0];
-    sheetParts.setName("Parts");
-  }
-  
-  if (sheetParts.getLastRow() === 0 || sheetParts.getRange("A1").getValue() === "") {
-    var partsHeaders = ["ประเภทอะไหล่", "รหัสสินค้า", "ชื่อสินค้า", "รายละเอียดสินค้า", "ลิงก์ภาพ", "จำนวนคงเหลือ", "หน่วย", "ราคา", "จุดสั่งซื้อ(Min)"];
-    sheetParts.appendRow(partsHeaders);
-  } else {
-    var headers = sheetParts.getRange(1, 1, 1, sheetParts.getLastColumn()).getValues()[0];
-    if (headers.indexOf("จุดสั่งซื้อ(Min)") === -1) {
-      sheetParts.getRange(1, headers.length + 1).setValue("จุดสั่งซื้อ(Min)");
+  // --- ฟังก์ชันเสริม: ตรวจสอบสร้างชีต และสร้างหัวคอลัมน์อัตโนมัติ ---
+  function getOrCreateSheet(sheetName) {
+    var sheet = ss.getSheetByName(sheetName);
+    if (sheet == null) {
+      // ถ้าไม่มีชีตชื่อนี้ ให้สร้างขึ้นมาใหม่
+      sheet = ss.insertSheet(sheetName);
+      
+      // เมื่อสร้างชีตใหม่ ให้ใส่หัวคอลัมน์ 5 คอลัมน์ (เพิ่ม Scale Name)
+      sheet.appendRow(["Timestamp", "Target weight", "Resulting weight", "Actual weight", "Scale Name"]);
+      
+      // ทำให้หัวคอลัมน์ A1-E1 เป็นตัวหนา และแช่แข็งแถวแรกไว้
+      sheet.getRange("A1:E1").setFontWeight("bold");
+      sheet.setFrozenRows(1);
     }
+    return sheet;
   }
+  // ------------------------------------------
+
+  // เรียกใช้ฟังก์ชันสร้างชีตหลักที่จะรวมข้อมูลทั้งหมด
+  var mainSheet = getOrCreateSheet("รวมข้อมูลตาชั่ง");
   
-  var partsData = sheetParts.getRange(1, 1, 1, Math.max(1, sheetParts.getLastColumn())).getValues()[0];
-  var colCodeIdx = partsData.indexOf("รหัสสินค้า");
-  if (colCodeIdx > -1) {
-    sheetParts.getRange(1, colCodeIdx + 1, sheetParts.getMaxRows(), 1).setNumberFormat("@");
-  }
+  var data = JSON.parse(e.postData.contents);
+  var timestamp = new Date();
   
-  // === 2. จัดการชีต History (ประวัติการเบิก) ===
-  var sheetHistory = ss.getSheetByName("History");
-  if (!sheetHistory) {
-     sheetHistory = ss.insertSheet("History");
-  }
+  // 1. ดึงข้อมูล Mode Timer  LS9
+  var d5032 = data.D5032;
+  var d102 = (data.D102 !== undefined) ? "'" + data.D102 : undefined; 
+  var d5040 = data.D5040;
   
-  if (sheetHistory.getLastRow() === 0 || sheetHistory.getRange("A1").getValue() === "") {
-     var historyHeaders = ["วันที่-เวลา", "เลขที่เอกสาร", "ชื่อ-สกุล ผู้เบิก", "วัตถุประสงค์การเบิก", "รหัสสินค้า", "ชื่อสินค้า", "จำนวนที่เบิก", "สถานะการทำรายการ", "ลิงก์ลายเซ็น"];
-     sheetHistory.appendRow(historyHeaders);
-  } else {
-      var histHeaders = sheetHistory.getRange(1, 1, 1, sheetHistory.getLastColumn()).getValues()[0];
-      if(histHeaders.indexOf("เลขที่เอกสาร") === -1) {
-          sheetHistory.insertColumnAfter(1);
-          sheetHistory.getRange(1, 2).setValue("เลขที่เอกสาร");
-          histHeaders = sheetHistory.getRange(1, 1, 1, sheetHistory.getLastColumn()).getValues()[0];
-      }
-      if(histHeaders.indexOf("สถานะการทำรายการ") === -1) {
-          sheetHistory.getRange(1, histHeaders.length + 1).setValue("สถานะการทำรายการ");
-          histHeaders = sheetHistory.getRange(1, 1, 1, sheetHistory.getLastColumn()).getValues()[0];
-      }
-      if(histHeaders.indexOf("ลิงก์ลายเซ็น") === -1) {
-          sheetHistory.getRange(1, histHeaders.length + 1).setValue("ลิงก์ลายเซ็น");
-      }
+  // 2. ดึงข้อมูล Mode Timer  UD1
+  var d5048 = data.D5048;
+  var d118 = (data.D118 !== undefined) ? "'" + data.D118 : undefined; 
+  var d5052 = data.D5052;
+
+  // 3. ดึงข้อมูล Mode Timer  LAS
+  var d5060 = data.D5060;
+  var d134 = (data.D134 !== undefined) ? "'" + data.D134 : undefined; 
+  var d5064 = data.D5064;
+
+  // 4. ดึงข้อมูล Mode Timer  CAUSTIC SODA 50%
+  var d5072 = data.D5072;
+  var d150 = (data.D150 !== undefined) ? "'" + data.D150 : undefined; 
+  var d5076 = data.D5076;
+
+  // 5. ดึงข้อมูล "Mode Weight  CAUSTIC SODA 50%" (แก้ไขชื่อตัวแปรให้ถูกต้องแล้ว)
+  var d5108 = data.D5108;
+  var d178 = (data.D178 !== undefined) ? "'" + data.D178 : undefined; 
+  var d5076_weight = data.D5076_weight; 
+
+  // --- บันทึกข้อมูลลงชีตเดียว และเพิ่มชื่อตาชั่งต่อท้าย ---
+
+  // 1. ข้อมูล "Mode Timer  LS9"
+  if (d5032 !== undefined || data.D102 !== undefined || d5040 !== undefined) {
+    mainSheet.appendRow([timestamp, d5032, d102, d5040, "Mode Timer  LS9"]);
   }
 
-  var historyData = sheetHistory.getRange(1, 1, 1, Math.max(1, sheetHistory.getLastColumn())).getValues()[0];
-  var historyPartIdIdx = historyData.indexOf("รหัสสินค้า");
-  if (historyPartIdIdx > -1) {
-     sheetHistory.getRange(1, historyPartIdIdx + 1, sheetHistory.getMaxRows(), 1).setNumberFormat("@");
+  // 2. ข้อมูล "Mode Timer  UD1"
+  if (d5048 !== undefined || data.D118 !== undefined || d5052 !== undefined) {
+    mainSheet.appendRow([timestamp, d5048, d118, d5052, "Mode Timer  UD1"]); 
   }
-  
-  return { parts: sheetParts, history: sheetHistory };
+
+  // 3. ข้อมูล "Mode Timer  LAS"
+  if (d5060 !== undefined || data.D134 !== undefined || d5064 !== undefined) {
+    mainSheet.appendRow([timestamp, d5060, d134, d5064, "Mode Timer  LAS"]); 
+  }
+
+  // 4. ข้อมูล "Mode Timer  CAUSTIC SODA 50%" 
+  if (d5072 !== undefined || data.D150 !== undefined || d5076 !== undefined) {
+    mainSheet.appendRow([timestamp, d5072, d150, d5076, "Mode Timer  CAUSTIC SODA 50%"]); 
+  }
+
+  // 5. ข้อมูล "Mode Weight  CAUSTIC SODA 50%"
+  if (d5108 !== undefined || data.D178 !== undefined || d5076_weight !== undefined) {
+    mainSheet.appendRow([timestamp, d5108, d178, d5076_weight, "Mode Weight  CAUSTIC SODA 50%"]); 
+  }
+
+  return ContentService.createTextOutput(JSON.stringify({
+    "result": "success", 
+    "timestamp": timestamp
+  })).setMimeType(ContentService.MimeType.JSON);
 }
 
-function doGet(e) {
-  var sheets = setupEnvironment();
-  
-  var dataParts = sheets.parts.getDataRange().getValues();
-  var headersParts = dataParts[0]; 
-  var pColCat = headersParts.indexOf("ประเภทอะไหล่"), pColCode = headersParts.indexOf("รหัสสินค้า"), pColName = headersParts.indexOf("ชื่อสินค้า");
-  var pColDesc = headersParts.indexOf("รายละเอียดสินค้า"), pColImg = headersParts.indexOf("ลิงก์ภาพ"), pColStock = headersParts.indexOf("จำนวนคงเหลือ");
-  var pColUnit = headersParts.indexOf("หน่วย"), pColPrice = headersParts.indexOf("ราคา"), pColMin = headersParts.indexOf("จุดสั่งซื้อ(Min)"); 
-  var parts = [];
-  
-  for (var i = 1; i < dataParts.length; i++) {
-    var row = dataParts[i];
-    if (pColCode > -1 && row[pColCode] != "") {
-      parts.push({
-        "id": String(row[pColCode]).replace(/'/g, ''), "code": String(row[pColCode]).replace(/'/g, ''), "name": pColName > -1 ? String(row[pColName]) : "",
-        "desc": pColDesc > -1 ? String(row[pColDesc]) : "", "category": pColCat > -1 ? String(row[pColCat]) : "ทั่วไป",
-        "stock": pColStock > -1 && row[pColStock] !== "" ? Number(row[pColStock]) : 0, "unit": pColUnit > -1 && row[pColUnit] !== "" ? String(row[pColUnit]) : "ชิ้น",
-        "price": pColPrice > -1 && row[pColPrice] !== "" ? Number(row[pColPrice]) : 0, "image": pColImg > -1 && row[pColImg] !== "" ? String(row[pColImg]) : "",
-        "minStock": pColMin > -1 && row[pColMin] !== "" ? Number(row[pColMin]) : 5 
-      });
-    }
+// --- ฟังก์ชันจัดการเกณฑ์ % ผลต่าง (Tolerance %) ในชีต Config และ ScriptProperties ---
+function getStoredTolerance() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName("Config");
+  if (!configSheet) {
+    configSheet = ss.insertSheet("Config");
+    configSheet.appendRow(["Setting", "Value", "Description"]);
+    configSheet.appendRow(["TolerancePercent", 1.0, "เกณฑ์ % ผลต่างที่ยอมรับได้ (เช่น 1.0 คือ +-1.0%)"]);
+    configSheet.getRange("A1:C1").setFontWeight("bold");
+    configSheet.setFrozenRows(1);
+    return 1.0;
   }
-
-  var history = [];
-  if (sheets.history.getLastRow() > 1) {
-    var dataHist = sheets.history.getDataRange().getValues();
-    var headersHist = dataHist[0];
-    
-    var hColDate = headersHist.indexOf("วันที่-เวลา");
-    var hColReq = headersHist.indexOf("เลขที่เอกสาร");
-    var hColPartId = headersHist.indexOf("รหัสสินค้า");
-    var hColPartName = headersHist.indexOf("ชื่อสินค้า");
-    var hColStatus = headersHist.indexOf("สถานะการทำรายการ");
-    var hColSig = headersHist.indexOf("ลิงก์ลายเซ็น");
-    
-    var hColTech = headersHist.indexOf("ชื่อ-สกุล ผู้เบิก");
-    if (hColTech === -1) hColTech = headersHist.indexOf("ชื่อช่างผู้เบิก");
-    if (hColTech === -1) hColTech = headersHist.indexOf("รหัสช่าง / ชื่อช่าง");
-
-    var hColNote = headersHist.indexOf("วัตถุประสงค์การเบิก");
-    if (hColNote === -1) hColNote = headersHist.indexOf("หมายเหตุ");
-
-    var hColQty = headersHist.indexOf("จำนวนที่เบิก"); 
-    if (hColQty === -1) hColQty = headersHist.indexOf("จำนวนที่ทำรายการ");
-    
-    for (var j = 1; j < dataHist.length; j++) {
-      var hRow = dataHist[j];
-      if (hColDate > -1 && hRow[hColDate] != "") {
-        history.push({
-          "date": hRow[hColDate], "reqNo": hColReq > -1 ? String(hRow[hColReq]) : "-", "techName": hColTech > -1 ? String(hRow[hColTech]) : "",
-          "note": hColNote > -1 ? String(hRow[hColNote]) : "", "partId": hColPartId > -1 ? String(hRow[hColPartId]).replace(/'/g, '') : "",
-          "partName": hColPartName > -1 ? String(hRow[hColPartName]) : "", "qty": hColQty > -1 ? Number(hRow[hColQty]) : 0,
-          "status": hColStatus > -1 ? String(hRow[hColStatus]) : "",
-          "signature": hColSig > -1 ? String(hRow[hColSig]) : ""
-        });
-      }
-    }
-  }
-
-  return ContentService.createTextOutput(JSON.stringify({ "parts": parts, "history": history })).setMimeType(ContentService.MimeType.JSON);
+  var val = parseFloat(configSheet.getRange("B2").getValue());
+  return (!isNaN(val) && val > 0) ? val : 1.0;
 }
 
-function doPost(e) {
+function setStoredTolerance(val) {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var configSheet = ss.getSheetByName("Config");
+  if (!configSheet) {
+    configSheet = ss.insertSheet("Config");
+    configSheet.appendRow(["Setting", "Value", "Description"]);
+    configSheet.appendRow(["TolerancePercent", val, "เกณฑ์ % ผลต่างที่ยอมรับได้ (เช่น 1.0 คือ +-1.0%)"]);
+    configSheet.getRange("A1:C1").setFontWeight("bold");
+    configSheet.setFrozenRows(1);
+  } else {
+    configSheet.getRange("B2").setValue(val);
+  }
+  PropertiesService.getScriptProperties().setProperty("tolerancePercent", String(val));
+}
+
+// --- ฟังก์ชันสำหรับทดสอบจำลองการส่งข้อมูล ---
+function simulateHMI() {
+  // 1. นำ URL Web App ของคุณ (ที่ได้จากตอน Deploy) มาใส่ในเครื่องหมายคำพูดด้านล่าง
+  var webAppUrl = "https://script.google.com/macros/s/AKfycbypaCUR6SFtNcLl1X4fti6yLZXWvic1h01S2cRS9wgJMzUAx82tOhnXd3yWu1J4DVbtcA/exec"; 
+  
+  // 2. จำลองข้อมูล JSON ที่จอ HMI จะส่งมา (แก้ตัวเลขเพื่อทดสอบได้เลย)
+  var testData = {
+    // ตัวอย่าง: จำลองส่งข้อมูลของ Mode Weight CAUSTIC SODA 50%
+    "D5108": 200,             // Target weight
+    "D178": 199.5,            // Resulting weight
+    "D5076_weight": 199.5     // Actual weight ของโหมด Weight (ส่งเป็น D5076_weight)
+  };
+  
+  var options = {
+    "method": "post",
+    "contentType": "application/json",
+    "payload": JSON.stringify(testData)
+  };
+  
   try {
-    var postData = JSON.parse(e.postData.contents);
-    var sheets = setupEnvironment();
-    var sheetParts = sheets.parts;
-    var sheetHistory = sheets.history;
-    
-    var dataParts = sheetParts.getDataRange().getValues();
-    var headers = dataParts[0];
-    
-    var colCategory = headers.indexOf("ประเภทอะไหล่");
-    var colCode = headers.indexOf("รหัสสินค้า");
-    var colName = headers.indexOf("ชื่อสินค้า");
-    var colDesc = headers.indexOf("รายละเอียดสินค้า");
-    var colImage = headers.indexOf("ลิงก์ภาพ");
-    var colStock = headers.indexOf("จำนวนคงเหลือ");
-    var colUnit = headers.indexOf("หน่วย");
-    var colPrice = headers.indexOf("ราคา");
-    var colMin = headers.indexOf("จุดสั่งซื้อ(Min)");
-    
-    var histHeaders = sheetHistory.getRange(1, 1, 1, sheetHistory.getLastColumn()).getValues()[0];
-    var hIdxDate = histHeaders.indexOf("วันที่-เวลา");
-    var hIdxReq = histHeaders.indexOf("เลขที่เอกสาร");
-    var hIdxTech = histHeaders.indexOf("ชื่อ-สกุล ผู้เบิก"); if(hIdxTech===-1) hIdxTech = histHeaders.indexOf("ชื่อช่างผู้เบิก");
-    var hIdxNote = histHeaders.indexOf("วัตถุประสงค์การเบิก"); if(hIdxNote===-1) hIdxNote = histHeaders.indexOf("หมายเหตุ");
-    var hIdxCode = histHeaders.indexOf("รหัสสินค้า");
-    var hIdxName = histHeaders.indexOf("ชื่อสินค้า");
-    var hIdxQty = histHeaders.indexOf("จำนวนที่เบิก"); if(hIdxQty===-1) hIdxQty = histHeaders.indexOf("จำนวนที่ทำรายการ");
-    var hIdxStat = histHeaders.indexOf("สถานะการทำรายการ");
-    var hIdxSig = histHeaders.indexOf("ลิงก์ลายเซ็น");
-    
-    var timestamp = new Date();
-    
-    // ==========================================
-    // กรณีที่ 1: เบิกของ (Checkout)
-    // ==========================================
-    if (postData.action === "checkout") {
-      var reqNo = postData.reqNo || "-"; 
-      var techName = postData.techName;
-      var note = postData.note;
-      var signatureImage = postData.signatureImage; 
-      var existingSignatureUrl = postData.existingSignatureUrl;
-      var cart = postData.cart;
-      
-      var signatureUrl = existingSignatureUrl || "";
-      var sigErrMsg = ""; // เก็บ error message ถ้า upload ล้มเหลว
-      
-      // [BUG FIX #1] เพิ่ม null check ก่อน split base64
-      if (!signatureUrl && signatureImage) {
-        try {
-          // โฟลเดอร์ที่รับมาจาก User สำหรับเก็บลายเซ็น
-          var folderId = "1tuWCNMmNi8yWMPHtz7_S4leNqRUkFEW6";
-          var folder = DriveApp.getFolderById(folderId);
-          // [BUG FIX #2] ป้องกัน base64Data เป็น undefined ถ้า format ผิด
-          var parts64 = signatureImage.split(',');
-          var base64Data = parts64.length > 1 ? parts64[1] : parts64[0];
-          if (!base64Data) throw new Error("base64 data is empty");
-          var blob = Utilities.newBlob(Utilities.base64Decode(base64Data), "image/png", "Signature_" + reqNo + ".png");
-          var file = folder.createFile(blob);
-          file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-          signatureUrl = 'https://lh3.googleusercontent.com/d/' + file.getId();
-        } catch (sigErr) {
-          sigErrMsg = sigErr.toString(); // เก็บ error เพื่อส่งกลับ frontend
-          console.error("Signature upload failed: " + sigErr);
-          // ไม่ throw เพื่อให้บันทึกรายการเบิกได้แม้ลายเซ็นล้มเหลว
-        }
-      }
-
-      for (var i = 0; i < cart.length; i++) {
-        var cartItem = cart[i];
-        var partId = cartItem.id;
-        var qtyToDeduct = Number(cartItem.quantity);
-        var partName = "ไม่ทราบชื่อ";
-
-        if (colCode > -1 && colStock > -1) {
-          for (var r = 1; r < dataParts.length; r++) {
-            if (String(dataParts[r][colCode]).replace(/'/g, '') === String(partId).replace(/'/g, '')) { 
-              partName = colName > -1 ? dataParts[r][colName] : "ไม่ทราบชื่อ";
-              var currentStock = Number(dataParts[r][colStock]);
-              // [BUG FIX #3] ป้องกันสต็อกติดลบ
-              var newStock = Math.max(0, currentStock - qtyToDeduct);
-              sheetParts.getRange(r + 1, colStock + 1).setValue(newStock);
-              break; 
-            }
-          }
-        }
-        
-        var newRow = new Array(histHeaders.length).fill("");
-        if(hIdxDate > -1) newRow[hIdxDate] = timestamp;
-        if(hIdxReq > -1) newRow[hIdxReq] = reqNo;
-        if(hIdxTech > -1) newRow[hIdxTech] = techName;
-        if(hIdxNote > -1) newRow[hIdxNote] = note;
-        if(hIdxCode > -1) newRow[hIdxCode] = "'" + String(partId);
-        if(hIdxName > -1) newRow[hIdxName] = partName;
-        if(hIdxQty > -1) newRow[hIdxQty] = qtyToDeduct;
-        if(hIdxStat > -1) newRow[hIdxStat] = "เบิกจ่าย";
-        if(hIdxSig > -1) newRow[hIdxSig] = signatureUrl; // บันทึกลิงก์ลายเซ็นลงคอลัมน์
-        
-        sheetHistory.appendRow(newRow);
-      }
-      return ContentService.createTextOutput(JSON.stringify({ 
-        "status": "success", 
-        "message": "ตัดสต็อกแล้ว",
-        "signatureSaved": signatureUrl !== "",
-        "signatureError": sigErrMsg
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-    
-    // ==========================================
-    // กรณีที่ 2: เติมของ (Restock)
-    // ==========================================
-    if (postData.action === "restock") {
-      var restockPartId = postData.partId;
-      var addQty = Number(postData.addQty);
-      var newMin = Number(postData.newMin) || 5;
-      
-      // [BUG FIX #4] validate addQty ฝั่ง server
-      if (isNaN(addQty) || addQty <= 0) {
-        return ContentService.createTextOutput(JSON.stringify({ "status": "error", "message": "จำนวนที่เติมไม่ถูกต้อง" })).setMimeType(ContentService.MimeType.JSON);
-      }
-      
-      var restockPartName = "ไม่ทราบชื่อ";
-
-      if (colCode > -1 && colStock > -1) {
-          for (var rowIdx = 1; rowIdx < dataParts.length; rowIdx++) {
-            if (String(dataParts[rowIdx][colCode]).replace(/'/g, '') === String(restockPartId).replace(/'/g, '')) { 
-              restockPartName = colName > -1 ? dataParts[rowIdx][colName] : "ไม่ทราบชื่อ";
-              var currentRestockStock = Number(dataParts[rowIdx][colStock]); 
-              sheetParts.getRange(rowIdx + 1, colStock + 1).setValue(currentRestockStock + addQty); 
-              if(colMin > -1) sheetParts.getRange(rowIdx + 1, colMin + 1).setValue(newMin);
-              break; 
-            }
-          }
-      }
-      
-      var newHistRow = new Array(histHeaders.length).fill("");
-      if(hIdxDate > -1) newHistRow[hIdxDate] = timestamp;
-      if(hIdxReq > -1) newHistRow[hIdxReq] = "-";
-      if(hIdxTech > -1) newHistRow[hIdxTech] = "ผู้ดูแลระบบ";
-      if(hIdxNote > -1) newHistRow[hIdxNote] = "เติมสต็อกเข้าคลัง";
-      if(hIdxCode > -1) newHistRow[hIdxCode] = "'" + String(restockPartId);
-      if(hIdxName > -1) newHistRow[hIdxName] = restockPartName;
-      if(hIdxQty > -1) newHistRow[hIdxQty] = addQty;
-      if(hIdxStat > -1) newHistRow[hIdxStat] = "รับเข้า (เติม)";
-      
-      sheetHistory.appendRow(newHistRow);
-      return ContentService.createTextOutput(JSON.stringify({ "status": "success", "message": "เติมสต็อกสำเร็จ" })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // ==========================================
-    // กรณีที่ 3: เพิ่ม/แก้ไข สินค้า (Save Part)
-    // ==========================================
-    if (postData.action === "savePart") {
-      var isEdit = postData.isEdit;
-      var pd = postData.partData; 
-      var safeCode = "'" + String(pd.code); 
-      var imageUrl = pd.image; 
-
-      if (postData.imageFile) {
-        try {
-          // โฟลเดอร์ที่รับมาจาก User สำหรับเก็บภาพสินค้า
-          var imgFolderId = "1tuWCNMmNi8yWMPHtz7_S4leNqRUkFEW6"; 
-          var imgFolder = DriveApp.getFolderById(imgFolderId);
-          var decodedData = Utilities.base64Decode(postData.imageFile);
-          var imgBlob = Utilities.newBlob(decodedData, postData.imageMimeType, postData.imageName);
-          var imgFile = imgFolder.createFile(imgBlob);
-          imgFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-          imageUrl = 'https://lh3.googleusercontent.com/d/' + imgFile.getId();
-        } catch (imgErr) {
-          // [BUG FIX #5] เปลี่ยนชื่อ catch variable จาก 'e' → 'imgErr' ไม่ให้ทับ doPost parameter
-          return ContentService.createTextOutput(JSON.stringify({ "status": "error", "message": "อัปโหลดภาพล้มเหลว: " + imgErr.toString() })).setMimeType(ContentService.MimeType.JSON);
-        }
-      }
-
-      if (isEdit) {
-        for (var ei = 1; ei < dataParts.length; ei++) {
-          if (String(dataParts[ei][colCode]).replace(/'/g, '') === String(pd.code).replace(/'/g, '')) {
-            if(colCategory > -1) sheetParts.getRange(ei + 1, colCategory + 1).setValue(pd.category);
-            if(colName > -1) sheetParts.getRange(ei + 1, colName + 1).setValue(pd.name);
-            if(colDesc > -1) sheetParts.getRange(ei + 1, colDesc + 1).setValue(pd.desc);
-            if(colImage > -1) sheetParts.getRange(ei + 1, colImage + 1).setValue(imageUrl);
-            break;
-          }
-        }
-      } else {
-        var newRowPart = new Array(headers.length).fill("");
-        if(colCategory > -1) newRowPart[colCategory] = pd.category;
-        if(colCode > -1) newRowPart[colCode] = safeCode;
-        if(colName > -1) newRowPart[colName] = pd.name;
-        if(colDesc > -1) newRowPart[colDesc] = pd.desc;
-        if(colImage > -1) newRowPart[colImage] = imageUrl;
-        if(colStock > -1) newRowPart[colStock] = 0; 
-        if(colUnit > -1) newRowPart[colUnit] = "ชิ้น";
-        if(colPrice > -1) newRowPart[colPrice] = 0;
-        if(colMin > -1) newRowPart[colMin] = 5;
-        
-        sheetParts.appendRow(newRowPart);
-      }
-      return ContentService.createTextOutput(JSON.stringify({ "status": "success", "message": "บันทึกสินค้าเรียบร้อย" })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // ==========================================
-    // กรณีที่ 4: ลบสินค้า (Delete Part)
-    // ==========================================
-    if (postData.action === "deletePart") {
-      var delPartId = postData.partId;
-      // [BUG FIX] เช็ค colCode ก่อน loop เพื่อป้องกัน crash
-      if (colCode > -1) {
-        for (var k = 1; k < dataParts.length; k++) {
-          if (String(dataParts[k][colCode]).replace(/'/g, '') === String(delPartId).replace(/'/g, '')) {
-            sheetParts.deleteRow(k + 1);
-            break;
-          }
-        }
-      }
-      return ContentService.createTextOutput(JSON.stringify({ "status": "success", "message": "ลบสินค้าเรียบร้อย" })).setMimeType(ContentService.MimeType.JSON);
-    }
-    
-    return ContentService.createTextOutput(JSON.stringify({ "status": "error", "message": "คำสั่งไม่ถูกต้อง" })).setMimeType(ContentService.MimeType.JSON);
-
+    var response = UrlFetchApp.fetch(webAppUrl, options);
+    Logger.log("สถานะการส่ง: สำเร็จ!");
+    Logger.log("สิ่งที่ตอบกลับมา: " + response.getContentText());
   } catch (error) {
-    return ContentService.createTextOutput(JSON.stringify({ "status": "error", "message": error.toString() })).setMimeType(ContentService.MimeType.JSON);
+    Logger.log("เกิดข้อผิดพลาด: " + error.message);
   }
+}
+
+function testAuth() {
+  UrlFetchApp.fetch("https://www.google.com");
+}
+
+
+// --- ฟังก์ชันสำหรับส่งข้อมูล JSON ให้กับหน้าเว็บภายนอก (GitHub Pages) ---
+function doGet(e) {
+  var action = (e && e.parameter) ? e.parameter.action : null;
+  var callback = (e && e.parameter) ? e.parameter.callback : null;
+
+  // 1. ตรวจสอบการตั้งค่าเกณฑ์ Tolerance % (เมื่อมีคนเปลี่ยนจากหน้าเว็บ)
+  if (action === "setTolerance") {
+    var val = parseFloat(e.parameter.val);
+    if (!isNaN(val) && val > 0) {
+      setStoredTolerance(val);
+      var resObj = { result: "success", tolerancePercent: val };
+      var resJson = JSON.stringify(resObj);
+      if (callback) {
+        return ContentService.createTextOutput(callback + '(' + resJson + ')')
+            .setMimeType(ContentService.MimeType.JAVASCRIPT);
+      }
+      return ContentService.createTextOutput(resJson)
+          .setMimeType(ContentService.MimeType.JSON);
+    }
+  }
+
+  // 2. ส่งข้อมูลแดชบอร์ดตามปกติ (รวม rows และเกณฑ์ tolerancePercent ล่าสุด)
+  var data = getDashboardData();
+  var output = JSON.stringify(data);
+  
+  // รองรับ JSONP เผื่อกรณีเรียกข้ามโดเมนแบบพิเศษ
+  if (callback) {
+    return ContentService.createTextOutput(callback + '(' + output + ')')
+        .setMimeType(ContentService.MimeType.JAVASCRIPT);
+  }
+  
+  // ส่งออกข้อมูลในรูปแบบ JSON
+  return ContentService.createTextOutput(output)
+      .setMimeType(ContentService.MimeType.JSON);
+}
+
+// --- ฟังก์ชันสำหรับดึงข้อมูลจากชีตมาส่งให้หน้า Dashboard ---
+function getDashboardData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("รวมข้อมูลตาชั่ง");
+  var tolerance = getStoredTolerance();
+  
+  if (!sheet) {
+    return { rows: [], tolerancePercent: tolerance };
+  }
+  
+  var lastRow = sheet.getLastRow();
+  if (lastRow <= 1) {
+    return { rows: [], tolerancePercent: tolerance };
+  }
+  
+  // ดึงข้อมูลทั้งหมดที่มีในชีต
+  var data = sheet.getDataRange().getValues();
+  
+  // แปลงวันที่ให้อยู่ในรูป ISO String หรือข้อความ เพื่อส่งผ่านไปยังหน้าเว็บได้อย่างเสถียร
+  var formattedData = data.map(function(row, idx) {
+    if (idx === 0) return row; // แถวหัวตารางคงเดิม
+    var dateVal = row[0];
+    var dateStr = (dateVal instanceof Date) ? dateVal.toISOString() : (dateVal ? String(dateVal) : "");
+    return [
+      dateStr,
+      row[1],
+      row[2],
+      row[3],
+      row[4] ? String(row[4]) : ""
+    ];
+  });
+  
+  return {
+    rows: formattedData,
+    tolerancePercent: tolerance
+  };
 }

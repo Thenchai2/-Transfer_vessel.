@@ -1,459 +1,3198 @@
 <!DOCTYPE html>
-<html lang="th">
+<html lang="th" data-bs-theme="dark">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>แดชบอร์ดข้อมูลการส่งออก</title>
-    
-    <!-- Tailwind CSS สำหรับการจัดรูปแบบ -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Chart.js สำหรับสร้างกราฟ -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    
-    <!-- PapaParse สำหรับอ่านไฟล์ CSV จาก URL -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    
-    <!-- Google Fonts (Sarabun) -->
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <style>
-        body {
-            font-family: 'Sarabun', sans-serif;
-            background-color: #f3f4f6;
-        }
-        /* Custom Scrollbar for table */
-        .table-container::-webkit-scrollbar {
-            width: 8px;
-            height: 8px;
-        }
-        .table-container::-webkit-scrollbar-track {
-            background: #f1f1f1; 
-            border-radius: 4px;
-        }
-        .table-container::-webkit-scrollbar-thumb {
-            background: #cbd5e1; 
-            border-radius: 4px;
-        }
-        .table-container::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8; 
-        }
-        
-        /* Loading overlay */
-        #loadingOverlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255,255,255,0.8);
-            z-index: 50;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            backdrop-filter: blur(2px);
-        }
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3b82f6;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PP CHEMICAL DOSING SYSTEM</title>
+  <link rel="icon" type="image/png" href="https://lh3.googleusercontent.com/d/1kH8HErbms_U0xnoiJ7jlW7r79FK3hXeB">
+  <!-- โหลด Bootstrap 5 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+  <!-- โหลด Chart.js สำหรับทำกราฟ SCADA -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- โหลด SheetJS สำหรับส่งออกข้อมูลเป็น Excel (.xlsx) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    /* ใช้ฟอนต์เดิมที่อ่านง่าย คมชัด มาตรฐานระบบ (Segoe UI / Tahoma) ไม่ใช้ฟอนต์แปลกตา */
+    body {
+      background-color: #0f172a;
+      color: #f1f5f9;
+      font-family: 'Segoe UI', Tahoma, -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 14.5px;
+      padding-bottom: 30px;
+    }
+
+    /* SCADA Top Header */
+    .scada-navbar {
+      background-color: #1e293b;
+      border-bottom: 2px solid #3b82f6;
+      padding: 12px 20px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .scada-title {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: 0.5px;
+    }
+
+    /* กล่องแผงควบคุมสไตล์ SCADA Control Room */
+    .scada-panel {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    }
+
+    .scada-panel-header {
+      background-color: #273549;
+      border-bottom: 1px solid #334155;
+      padding: 10px 16px;
+      font-weight: 600;
+      color: #93c5fd;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-top-left-radius: 8px;
+      border-top-right-radius: 8px;
+    }
+
+    /* การ์ดสถานีตาชั่ง (Station Mimic Card) */
+    .station-mimic-card {
+      background-color: #162032;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 14px;
+      height: 100%;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .station-mimic-card:hover {
+      border-color: #60a5fa;
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
+    }
+
+    /* กล่องหน้าปัดแสดงค่าน้ำหนัก Target และ Actual */
+    .readout-box {
+      border-radius: 6px;
+      padding: 8px 10px;
+      text-align: center;
+    }
+    .readout-target {
+      background-color: rgba(255, 152, 0, 0.1);
+      border: 1px solid #ff9800;
+    }
+    .readout-target .readout-label {
+      color: #ffb74d;
+      font-weight: 600;
+    }
+    .readout-target .readout-value {
+      color: #ff9800;
+      font-weight: 700;
+    }
+
+    .readout-actual {
+      background-color: rgba(0, 230, 118, 0.1);
+      border: 1px solid #00e676;
+    }
+    .readout-actual .readout-label {
+      color: #69f0ae;
+      font-weight: 600;
+    }
+    .readout-actual .readout-value {
+      color: #00e676;
+      font-weight: 700;
+    }
+
+    .readout-label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      margin-bottom: 2px;
+    }
+    .readout-value {
+      font-size: 1.35rem;
+      line-height: 1.2;
+    }
+
+    /* ไฟ LED แสดงสถานะ */
+    .status-led {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background-color: #10b981;
+      box-shadow: 0 0 8px #10b981;
+      margin-right: 6px;
+    }
+    .status-led.idle {
+      background-color: #94a3b8;
+      box-shadow: none;
+    }
+
+    /* หลอดเกจความคืบหน้า SCADA Bar */
+    .scada-progress {
+      height: 7px;
+      background-color: #0f172a;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 8px;
+      border: 1px solid #334155;
+    }
+    .scada-progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #3b82f6, #10b981);
+      transition: width 0.4s ease;
+    }
+
+    /* กล่องตัวกรองวันที่ */
+    .filter-card {
+      background-color: #162032;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin-bottom: 20px;
+    }
+
+    .form-control, .form-select {
+      background-color: #0f172a;
+      border: 1px solid #475569;
+      color: #ffffff;
+      font-size: 14px;
+    }
+    .form-control:focus, .form-select:focus {
+      background-color: #1e293b;
+      color: #ffffff;
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 0.25rem rgba(59, 130, 246, 0.25);
+    }
+
+    /* ตาราง SCADA คอนทราสต์สูง */
+    .table-scada {
+      --bs-table-color: #ffffff !important;
+      --bs-table-bg: transparent !important;
+      --bs-table-border-color: #334155 !important;
+      color: #ffffff !important;
+      margin-bottom: 0;
+      font-size: 14px;
+    }
+    .table-scada thead th {
+      background-color: #1a2536 !important;
+      color: #93c5fd !important;
+      border-bottom: 2px solid #3b82f6 !important;
+      border-top: none;
+      padding: 10px;
+      text-align: center;
+      vertical-align: middle;
+      font-weight: 700;
+      position: sticky;
+      top: 0;
+      z-index: 2;
+    }
+    .table-scada tbody td {
+      color: #ffffff !important; /* บังคับให้ข้อความทุกช่องในตารางเป็นสีขาวสว่างชัดเจน ไม่โดน Bootstrap ทับ */
+      border-color: #273549 !important;
+      padding: 9px 10px;
+      vertical-align: middle;
+      background-color: transparent !important;
+    }
+    .table-scada tbody tr:hover {
+      background-color: rgba(59, 130, 246, 0.12) !important;
+    }
+    .table-container {
+      max-height: 420px;
+      overflow-y: auto;
+    }
+
+    .text-num {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ช่องลำดับ (Index Column) ชัดเจน 100% */
+    .col-idx {
+      color: #38bdf8 !important; /* สีฟ้าสว่างสดใส คอนทราสต์สูงมาก */
+      font-weight: 700 !important;
+      font-size: 14px !important;
+      text-align: center !important;
+    }
+
+    /* ปรับสีข้อความทุกจุดที่เคยมืด ให้สว่าง คมชัด ไม่กลืนกับพื้นหลัง SCADA ดำ */
+    :root, [data-bs-theme="dark"] {
+      --bs-body-color: #f8fafc;
+      --bs-body-bg: #0f172a;
+      --bs-secondary-color: #f1f5f9;
+      --bs-tertiary-color: #cbd5e1;
+    }
+
+    .text-muted,
+    .text-body-secondary,
+    .text-secondary-emphasis,
+    [class*="text-muted"],
+    .small.text-muted {
+      color: #f8fafc !important; /* สีขาวสว่าง คอนทราสต์สูงสุด ไม่จมมืด */
+      --bs-text-opacity: 1 !important;
+    }
+    .text-secondary {
+      color: #ff9800 !important; /* สีส้ม Target คอนทราสต์สูง */
+    }
+    label.form-label, label.text-muted, label.text-light {
+      color: #ffffff !important;
+      font-weight: 600;
+    }
+
+    /* Quick Buttons */
+    .btn-quick-date {
+      font-size: 0.8rem;
+      padding: 3px 10px;
+      color: #f1f5f9;
+      border-color: #64748b;
+    }
+    .btn-quick-date:hover {
+      background-color: #2563eb;
+      border-color: #2563eb;
+      color: #ffffff;
+    }
+
+    /* ==========================================================
+       SCADA Tab Navigation & Tank Farm Mimic Styles
+       ========================================================== */
+    .scada-nav-pills {
+      background: #162032;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 6px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+    }
+    .scada-tab-btn {
+      color: #94a3b8 !important;
+      font-weight: 600;
+      font-size: 14.5px;
+      padding: 9px 20px;
+      border-radius: 8px !important;
+      border: 1px solid transparent;
+      transition: all 0.2s ease-in-out;
+    }
+    .scada-tab-btn:hover {
+      background-color: #1e293b;
+      color: #ffffff !important;
+      border-color: #475569;
+    }
+    .scada-tab-btn.active {
+      background: linear-gradient(135deg, #2563eb, #1d4ed8) !important;
+      color: #ffffff !important;
+      border-color: #60a5fa !important;
+      box-shadow: 0 4px 14px rgba(37, 99, 235, 0.45);
+    }
+
+    /* การ์ดสรุปยอดการใช้งานสารเคมีแต่ละชนิด (Chemical Usage Summary Cards) */
+    .chem-usage-card {
+      background: #162032;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      transition: all 0.25s ease-in-out;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+      position: relative;
+      overflow: hidden;
+    }
+    .chem-usage-card:hover {
+      border-color: #60a5fa;
+      box-shadow: 0 6px 18px rgba(59, 130, 246, 0.3);
+      transform: translateY(-2px);
+    }
+    .chem-usage-card-total {
+      background: linear-gradient(145deg, #162032 0%, #1e293b 100%);
+      border: 1px solid #f59e0b;
+      box-shadow: 0 4px 14px rgba(245, 158, 11, 0.2);
+    }
+    .chem-usage-card-total:hover {
+      border-color: #fbbf24;
+      box-shadow: 0 6px 20px rgba(245, 158, 11, 0.35);
+    }
+    .chem-usage-main {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 10px;
+      margin: 8px 0;
+      text-align: center;
+    }
+    .chem-usage-value {
+      font-size: 1.6rem;
+      font-weight: 800;
+      font-variant-numeric: tabular-nums;
+      line-height: 1.2;
+    }
+
+    /* Tank Farm Summary KPI Cards */
+    .tank-kpi-card {
+      background-color: #162032;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      height: 100%;
+      box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+    }
+    .tank-kpi-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 24px;
+      flex-shrink: 0;
+    }
+
+    /* Tank Graphic & Mimic Card */
+    .tank-card {
+      background: #162032;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 16px;
+      height: 100%;
+      position: relative;
+      overflow: hidden;
+      transition: border-color 0.25s, box-shadow 0.25s, transform 0.2s;
+    }
+    .tank-card:hover {
+      border-color: #60a5fa;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 15px rgba(59, 130, 246, 0.25);
+      transform: translateY(-2px);
+    }
+    .tank-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #273549;
+    }
+    .tank-graphic-wrapper {
+      position: relative;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 10px 0 16px 0;
+    }
+    .tank-cylinder {
+      width: 105px;
+      height: 210px;
+      border-radius: 24px 24px 14px 14px;
+      border: 3px solid #64748b;
+      background: linear-gradient(90deg, rgba(30, 41, 59, 0.9) 0%, rgba(15, 23, 42, 0.98) 50%, rgba(30, 41, 59, 0.9) 100%);
+      position: relative;
+      overflow: hidden;
+      box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.85), 0 6px 16px rgba(0, 0, 0, 0.4);
+    }
+    /* แถบเงาสะท้อนกระจกทรงกระบอก SCADA Glass Reflection */
+    .tank-cylinder::after {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 10px;
+      width: 18px;
+      height: 100%;
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.24) 0%, rgba(255, 255, 255, 0.03) 100%);
+      border-radius: 10px;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .tank-liquid {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 100%;
+      height: 0%;
+      transition: height 1.2s cubic-bezier(0.34, 1.2, 0.64, 1);
+      z-index: 1;
+      opacity: 0.88;
+    }
+    .tank-liquid-wave {
+      position: absolute;
+      top: -6px;
+      left: 0;
+      width: 200%;
+      height: 12px;
+      background: radial-gradient(ellipse at center, rgba(255,255,255,0.45) 0%, transparent 70%);
+      opacity: 0.8;
+      animation: tankWave 3s infinite linear;
+    }
+    @keyframes tankWave {
+      0% { transform: translateX(0); }
+      50% { transform: translateX(-25%); }
+      100% { transform: translateX(0); }
+    }
+    /* สเกลบอกระดับ % ข้างแท็งก์ */
+    .tank-ruler {
+      position: absolute;
+      right: 12px;
+      top: 15px;
+      bottom: 15px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      font-size: 10px;
+      color: #64748b;
+      font-family: monospace;
+      user-select: none;
+    }
+    .tank-ruler-mark {
+      display: flex;
+      align-items: center;
+      gap: 3px;
+    }
+    .tank-ruler-line {
+      width: 6px;
+      height: 1px;
+      background: #475569;
+    }
+    .tank-pct-bubble {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 20px;
+      padding: 3px 11px;
+      font-weight: 800;
+      font-size: 15px;
+      color: #ffffff;
+      z-index: 6;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(4px);
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+    .tank-readout-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      margin-top: 10px;
+    }
+    .tank-readout-item {
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 6px 8px;
+      text-align: center;
+    }
+    .tank-readout-label {
+      font-size: 11px;
+      color: #94a3b8;
+      font-weight: 600;
+      margin-bottom: 2px;
+    }
+    .tank-readout-val {
+      font-size: 13.5px;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+      color: #f8fafc;
+    }
+  </style>
 </head>
-<body class="text-gray-800 relative min-h-screen">
+<body>
 
-    <!-- Loading Overlay -->
-    <div id="loadingOverlay">
-        <div class="spinner mb-4"></div>
-        <div class="text-lg font-semibold text-blue-600">กำลังดึงข้อมูลจาก Google Sheets...</div>
-        <div class="text-sm text-gray-500 mt-2">กรุณารอสักครู่</div>
+  <!-- 1. แถบหัว SCADA Navbar -->
+  <div class="scada-navbar">
+    <div class="container-fluid px-2">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-3">
+          <img src="https://lh3.googleusercontent.com/d/1kH8HErbms_U0xnoiJ7jlW7r79FK3hXeB" alt="PP Logo" class="rounded shadow-sm" style="height: 46px; max-width: 120px; object-fit: contain; background: #ffffff; padding: 3px;">
+          <div>
+            <div class="d-flex align-items-center gap-2">
+              <span class="scada-title">PP CHEMICAL DOSING SYSTEM</span>
+              <span class="badge bg-primary text-white border border-primary-subtle">LINE-1</span>
+            </div>
+            <div class="small fw-semibold" style="color: #93c5fd;">ระบบติดตามน้ำหนักและการใช้งานเคมีอัตโนมัติ</div>
+          </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <div class="px-3 py-1 rounded bg-dark border border-secondary text-success small fw-bold d-flex align-items-center">
+            <span class="status-led"></span> <span id="comm-status">ออนไลน์</span>
+          </div>
+          <div class="px-3 py-1 rounded bg-dark border border-secondary text-info small" id="live-clock">
+            00:00:00
+          </div>
+          <button class="btn btn-sm btn-outline-info fw-semibold d-flex align-items-center gap-1" onclick="openToleranceModal()" title="คลิกเพื่อปรับเกณฑ์ % ผลต่าง (ซิงค์ใช้ร่วมกันทุกคน)">
+            <i class="bi bi-sliders"></i> เกณฑ์ Diff: <span id="current-tolerance-badge" class="badge bg-warning text-dark fw-bold">±1.0%</span>
+          </button>
+          <div class="d-flex align-items-center gap-1 px-2 py-1 rounded bg-dark border border-secondary">
+            <label for="auto-refresh-select" class="small fw-semibold text-light mb-0" style="font-size: 13px;"><i class="bi bi-stopwatch text-info me-1"></i>ออโต้:</label>
+            <select id="auto-refresh-select" class="form-select form-select-sm py-0 px-2 bg-transparent text-white border-0 fw-semibold" style="width: auto; font-size: 13px; cursor: pointer;" onchange="toggleAutoRefresh(this.value)">
+              <option value="0" class="bg-dark text-white">ปิด</option>
+              <option value="15" class="bg-dark text-white">15 วินาที</option>
+              <option value="30" class="bg-dark text-white" selected>30 วินาที</option>
+              <option value="60" class="bg-dark text-white">60 วินาที</option>
+            </select>
+          </div>
+          <button class="btn btn-sm btn-primary fw-semibold" onclick="refreshCurrentTab()">
+            <i class="bi bi-arrow-repeat me-1"></i> รีเฟรชข้อมูล
+          </button>
+          <button class="btn btn-sm btn-success fw-semibold" onclick="exportToExcel()" title="ดาวน์โหลดรายงานเป็นไฟล์ Excel">
+            <i class="bi bi-file-earmark-excel me-1"></i> ส่งออก Excel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="container-fluid px-3">
+
+    <!-- แถบเลือกหน้า SCADA Navigation Tabs (สลับระหว่างระบบแบ่งจ่ายเคมี กับ ปริมาณสารเคมีในแท็งก์) -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+      <ul class="nav nav-pills scada-nav-pills flex-grow-1" id="scadaMainTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active scada-tab-btn" id="tab-dosing-btn" data-bs-toggle="pill" data-bs-target="#tab-dosing-pane" type="button" role="tab" aria-controls="tab-dosing-pane" aria-selected="true">
+            <i class="bi bi-speedometer2 me-2 text-warning"></i>ระบบแบ่งจ่ายสารเคมี (Chemical Dosing System)
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link scada-tab-btn" id="tab-tanks-btn" data-bs-toggle="pill" data-bs-target="#tab-tanks-pane" type="button" role="tab" aria-controls="tab-tanks-pane" aria-selected="false" onclick="onTankTabActivated()">
+            <i class="bi bi-droplet-half me-2 text-info"></i>ปริมาณสารเคมีในแท็งก์ (Tank Farm Inventory)
+            <span class="badge bg-primary ms-2" id="tank-badge-count">5 แท็งก์</span>
+          </button>
+        </li>
+      </ul>
     </div>
 
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- ส่วนเนื้อหาของแต่ละแท็บ (Tab Panes) -->
+    <div class="tab-content" id="scadaMainTabsContent">
 
-        <!-- Error Notification Banner (แทนการใช้ alert) -->
-        <div id="errorNotification" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-6 shadow-sm" role="alert">
-            <strong class="font-bold">แจ้งเตือน:</strong>
-            <span class="block sm:inline" id="errorText">ข้อความแจ้งเตือนจะแสดงที่นี่</span>
-            <span class="absolute top-0 bottom-0 right-0 px-4 py-3 cursor-pointer" onclick="closeError()">
-                <svg class="fill-current h-6 w-6 text-red-500" role="button" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><title>ปิด</title><path d="M14.348 14.849a1.2 1.2 0 0 1-1.697 0L10 11.819l-2.651 3.029a1.2 1.2 0 1 1-1.697-1.697l2.758-3.15-2.759-3.152a1.2 1.2 0 1 1 1.697-1.697L10 8.183l2.651-3.031a1.2 1.2 0 1 1 1.697 1.697l-2.758 3.152 2.758 3.15a1.2 1.2 0 0 1 0 1.698z"/></svg>
-            </span>
-        </div>
-        
-        <!-- Header -->
-        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
-            <div>
-                <h1 class="text-3xl font-bold text-gray-900">แดชบอร์ดสรุปงานส่งออก</h1>
-                <p class="text-gray-500 mt-1 flex items-center gap-2">
-                    <span class="inline-block w-2 h-2 rounded-full bg-green-500"></span>
-                    ซิงค์ข้อมูลสดจาก Google Sheets ชีต "ส่งออก"
-                </p>
-            </div>
-            
-            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-200 flex flex-col gap-3 w-full md:w-auto md:min-w-[400px]">
-                <div class="text-sm text-gray-600 font-medium">แหล่งข้อมูล (Google Sheets CSV URL):</div>
-                <div class="flex gap-2">
-                    <input type="text" id="sheetUrlInput" class="text-sm text-gray-700 border border-gray-300 rounded-md p-2 flex-grow focus:ring-blue-500 focus:border-blue-500 outline-none" readonly />
-                    <button id="loadSheetBtn" class="bg-blue-600 text-white px-3 py-2 rounded-md text-sm font-semibold hover:bg-blue-700 transition-colors whitespace-nowrap">
-                        รีเฟรชข้อมูล
-                    </button>
-                </div>
-            </div>
-        </div>
+      <!-- ======================================================== -->
+      <!-- TAB 1: ระบบแบ่งจ่ายสารเคมี (Dosing System Dashboard)    -->
+      <!-- ======================================================== -->
+      <div class="tab-pane fade show active" id="tab-dosing-pane" role="tabpanel" aria-labelledby="tab-dosing-btn">
 
-        <!-- Filters Section -->
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
-            <div class="flex items-center gap-3 w-full sm:w-auto">
-                <label for="typeFilter" class="font-semibold text-gray-700 whitespace-nowrap">ตัวกรองตามประเภท:</label>
-                <select id="typeFilter" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 outline-none transition-colors">
-                    <option value="all">-- ทุกประเภท --</option>
-                    <!-- Options จะถูกเพิ่มด้วย JavaScript -->
-                </select>
-            </div>
-            <div class="text-sm text-gray-500" id="recordCountDisplay">
-                แสดงข้อมูล: <span class="font-bold text-blue-600" id="currentCount">0</span> / <span id="totalCount">0</span> รายการ
-            </div>
+        <!-- 2. ส่วนการ์ดสถานีตาชั่ง สไตล์ SCADA Mimic (การใช้งานล่าสุดของแต่ละตาชั่ง) -->
+    <div class="scada-panel">
+      <div class="scada-panel-header">
+        <span><i class="bi bi-hdd-network text-info me-2"></i>STATION MIMIC PANELS (สถานะการใช้งานล่าสุดของแต่ละตาชั่ง)</span>
+        <span class="badge bg-dark border border-secondary" id="last-update-time" style="color: #cbd5e1;">รอโหลดข้อมูล...</span>
+      </div>
+      <div class="p-3">
+        <div class="row g-3" id="latest-cards-container">
+          <div class="col-12 text-center py-4 text-light">
+            <div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังซิงค์ข้อมูลสถานีตาชั่ง (Station Mimic)...
+          </div>
         </div>
-
-        <!-- KPIs -->
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 border-l-4 border-l-blue-500">
-                <div class="text-sm font-medium text-gray-500 mb-1">จำนวนการส่งออกทั้งหมด</div>
-                <div class="text-3xl font-bold text-gray-900" id="kpiTotal">0</div>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 border-l-4 border-l-emerald-500">
-                <div class="text-sm font-medium text-gray-500 mb-1">จำนวนสถานที่ติดตั้ง (ไม่ซ้ำ)</div>
-                <div class="text-3xl font-bold text-gray-900" id="kpiLocations">0</div>
-            </div>
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6 border-l-4 border-l-purple-500">
-                <div class="text-sm font-medium text-gray-500 mb-1">ประเภทที่มีการส่งออกสูงสุด</div>
-                <div class="text-3xl font-bold text-gray-900 text-xl truncate" id="kpiTopType">-</div>
-            </div>
-        </div>
-
-        <!-- Charts -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-            <!-- Chart 1: Bar Chart by Type -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h3 class="text-lg font-bold text-gray-800 mb-4">สัดส่วนตามประเภทอุปกรณ์</h3>
-                <div class="relative h-72">
-                    <canvas id="typeChart"></canvas>
-                </div>
-            </div>
-            
-            <!-- Chart 2: Line Chart over Time (Year) -->
-            <div class="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-                <h3 class="text-lg font-bold text-gray-800 mb-4">แนวโน้มการส่งออก (รายปี)</h3>
-                <div class="relative h-72">
-                    <canvas id="trendChart"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <!-- Data Table -->
-        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div class="px-6 py-4 border-b border-gray-100 bg-gray-50">
-                <h3 class="text-lg font-bold text-gray-800">ตารางข้อมูลการส่งออก</h3>
-            </div>
-            <div class="overflow-x-auto table-container max-h-[500px]">
-                <table class="w-full text-sm text-left text-gray-500">
-                    <thead class="text-xs text-gray-700 uppercase bg-gray-100 sticky top-0 shadow-sm z-10">
-                        <tr>
-                            <th scope="col" class="px-6 py-3 whitespace-nowrap">ลำดับ</th>
-                            <th scope="col" class="px-6 py-3 min-w-[200px]">สถานที่ติดตั้ง</th>
-                            <th scope="col" class="px-6 py-3 min-w-[150px]">ชื่ออุปกรณ์</th>
-                            <th scope="col" class="px-6 py-3 min-w-[150px]">เลขที่ Serial</th>
-                            <th scope="col" class="px-6 py-3 whitespace-nowrap">วันที่</th>
-                            <th scope="col" class="px-6 py-3 whitespace-nowrap">ประเภท</th>
-                        </tr>
-                    </thead>
-                    <tbody id="dataTableBody" class="divide-y divide-gray-200">
-                        <!-- Table rows will be inserted here -->
-                    </tbody>
-                </table>
-            </div>
-            <div id="noDataMessage" class="hidden p-8 text-center text-gray-500">
-                ไม่พบข้อมูลที่ตรงกับเงื่อนไข
-            </div>
-        </div>
-
+      </div>
     </div>
 
-    <script>
-        // ลิงก์ข้อมูลจาก Google Sheets ที่กำหนดเป็นค่าเริ่มต้น
-        const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSjOmZoCJScAOlZ02Y713ICfZ8eWlAKjSBPn1XSB2eG0luvoLjiPmuLzxbCsbKaC5dBmUyKmfXYaygG/pub?gid=169351827&single=true&output=csv";
+    <!-- 3. ส่วนตัวกรองช่วงเวลา (วันที่เริ่มต้น - วันที่สิ้นสุด) -->
+    <div class="filter-card">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2 pb-2 border-bottom border-secondary">
+        <span class="fw-bold text-info"><i class="bi bi-funnel-fill me-1"></i> ตัวกรองรายงานช่วงเวลา</span>
+        <div class="d-flex gap-1 flex-wrap">
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-date" onclick="setQuickDate('today')">วันนี้</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-date" onclick="setQuickDate('yesterday')">เมื่อวาน</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-date" onclick="setQuickDate('7days')">7 วันล่าสุด</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-date" onclick="setQuickDate('30days')">30 วัน</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-date" onclick="setQuickDate('all')">ทั้งหมด</button>
+        </div>
+      </div>
+      <div class="row g-2 align-items-end">
+        <div class="col-md-2">
+          <label class="form-label text-light small mb-1">วันที่เริ่มต้น (Start Date)</label>
+          <input type="date" class="form-control form-control-sm" id="start-date" onchange="filterData()">
+        </div>
+        <div class="col-md-2">
+          <label class="form-label text-light small mb-1">วันที่สิ้นสุด (End Date)</label>
+          <input type="date" class="form-control form-control-sm" id="end-date" onchange="filterData()">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label text-light small mb-1">เลือกสารเคมี (Chemical)</label>
+          <select class="form-select form-select-sm" id="chemical-filter" onchange="filterData()">
+            <option value="ALL">-- ทุกสารเคมี (แสดงรวม) --</option>
+            <option value="CAUSTIC SODA 50%">CAUSTIC SODA 50%</option>
+            <option value="LS9">LS9</option>
+            <option value="UD1">UD1</option>
+            <option value="LAS">LAS</option>
+          </select>
+        </div>
+        <div class="col-md-2">
+          <label class="form-label text-light small mb-1">เลือกโหมด (Mode)</label>
+          <select class="form-select form-select-sm" id="mode-filter" onchange="filterData()">
+            <option value="ALL">-- ทุกโหมด (สรุปรวมเคมี) --</option>
+            <option value="Mode Weight">Mode Weight</option>
+            <option value="Mode Timer">Mode Timer</option>
+          </select>
+        </div>
+        <div class="col-md-3 d-flex gap-2">
+          <button class="btn btn-sm btn-success w-100 fw-bold" onclick="filterData()">
+            <i class="bi bi-search me-1"></i> สรุปข้อมูล
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="clearFilter()" title="ล้างค่าตัวกรอง">
+            <i class="bi bi-arrow-counterclockwise"></i>
+          </button>
+        </div>
+      </div>
+    </div>
 
-        // ตัวแปรเก็บข้อมูล
-        let rawData = [];
-        let filteredData = [];
-        let chartInstances = { type: null, trend: null };
+    <!-- 4. ส่วนการ์ดสรุปยอดการใช้งานสารเคมีแต่ละชนิด (Chemical Usage Summary Cards) -->
+    <div class="scada-panel mb-3">
+      <div class="scada-panel-header flex-wrap gap-2">
+        <span><i class="bi bi-grid-1x2-fill text-info me-2"></i>สรุปยอดการใช้งานสารเคมีแต่ละชนิด (Chemical Usage Summary)</span>
+        <span class="small fw-semibold text-info" id="chem-cards-filter-hint">ช่วงเวลา: ข้อมูลทั้งหมด</span>
+      </div>
+      <div class="p-3">
+        <div class="row g-3 row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-5" id="chemical-usage-cards-row">
+          <div class="col-12 text-center py-4 text-light w-100">
+            <div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังประมวลผลข้อมูลยอดการใช้งานเคมี...
+          </div>
+        </div>
+      </div>
+    </div>
 
-        // โหลดข้อมูลอัตโนมัติเมื่อเปิดหน้า
-        document.addEventListener('DOMContentLoaded', () => {
-            const inputField = document.getElementById('sheetUrlInput');
-            inputField.value = GOOGLE_SHEET_CSV_URL;
-            
-            // ดึงข้อมูลทันที
-            fetchDataFromUrl(GOOGLE_SHEET_CSV_URL);
+    <!-- 5. ส่วนกราฟ SCADA (Bar Chart ยอดการใช้เคมีรวม + Line Chart Trend Target vs Actual) -->
+    <div class="row g-3 mb-3">
+      <!-- กราฟที่ 1: กราฟแท่ง ปริมาณการใช้เคมีจริง -->
+      <div class="col-lg-6">
+        <div class="scada-panel h-100 mb-0">
+          <div class="scada-panel-header">
+            <span><i class="bi bi-bar-chart-fill text-info me-2"></i><span id="barchart-title">ปริมาณสารเคมีที่ใช้งานจริงรวม (Total Chemical Used kg)</span></span>
+          </div>
+          <div class="p-3">
+            <div style="position: relative; height: 260px;">
+              <canvas id="barChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- กราฟที่ 2: กราฟเส้น Process Trend Target vs Actual -->
+      <div class="col-lg-6">
+        <div class="scada-panel h-100 mb-0">
+          <div class="scada-panel-header">
+            <span><i class="bi bi-graph-up text-info me-2"></i>PROCESS TREND RECORDER (เปรียบเทียบ Target vs Actual)</span>
+          </div>
+          <div class="p-3">
+            <div style="position: relative; height: 260px;">
+              <canvas id="trendChart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. ตารางสรุปปริมาณการใช้งานเคมี -->
+    <div class="scada-panel">
+      <div class="scada-panel-header">
+        <span><i class="bi bi-calculator text-info me-2"></i><span id="summary-panel-title">สรุปปริมาณการใช้งานเคมี (Chemical Usage Summary)</span></span>
+        <span class="small fw-semibold" id="filter-status" style="color: #93c5fd;">ช่วงเวลา: ข้อมูลทั้งหมด</span>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-scada table-hover align-middle mb-0" id="summary-table">
+          <thead>
+            <tr>
+              <th style="width: 50px;">ลำดับ</th>
+              <th class="text-start ps-3" id="summary-col-name">ชื่อสารเคมี (Chemical Name)</th>
+              <th style="width: 130px;">จำนวนรอบ (ครั้ง)</th>
+              <th style="width: 170px;">เป้าหมายรวม (Target: kg)</th>
+              <th style="width: 180px;">ใช้งานจริงรวม (Actual: kg)</th>
+              <th style="width: 140px;">ผลต่าง (Diff: kg)</th>
+              <th style="width: 140px;">เฉลี่ยต่อรอบ (kg/ครั้ง)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="7" class="text-center py-3 text-light">กำลังประมวลผลข้อมูล...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 6. ตารางประวัติบันทึกการชั่งละเอียด (SCADA Event & Transaction Log) -->
+    <div class="scada-panel mb-4">
+      <div class="scada-panel-header flex-wrap gap-2">
+        <span><i class="bi bi-card-checklist text-info me-2"></i>ประวัติการบันทึกการชั่ง (Transaction Details)</span>
+        <div class="d-flex align-items-center gap-2">
+          <span class="small fw-semibold text-white">พบทั้งหมด <b id="detail-count" class="text-warning fw-bold fs-6">0</b> รายการ (แสดงหน้าละ 20 รายการ)</span>
+          <button class="btn btn-sm btn-outline-success py-0 px-2 fw-semibold" onclick="exportToExcel()">
+            <i class="bi bi-file-earmark-excel me-1"></i> Excel
+          </button>
+        </div>
+      </div>
+      <div class="table-container">
+        <table class="table table-scada table-hover align-middle text-center mb-0" id="detail-table">
+          <thead>
+            <tr>
+              <th style="width: 50px;">ลำดับ</th>
+              <th style="width: 170px;">วัน-เวลา (Timestamp)</th>
+              <th class="text-start ps-3">ชื่อสารเคมี (Chemical)</th>
+              <th style="width: 130px;">โหมด (Mode)</th>
+              <th style="width: 130px;">Target (kg)</th>
+              <th style="width: 130px;">Actual (kg)</th>
+              <th style="width: 130px;">ผลต่าง (Diff)</th>
+              <th style="width: 145px;">สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="8" class="text-center py-4 text-light">กำลังซิงค์ข้อมูลระบบ (Synchronizing System Data)...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- แถบเลื่อนหน้า Pagination << หน้า >> -->
+      <div class="p-3 bg-dark bg-opacity-75 border-top border-secondary d-flex justify-content-between align-items-center flex-wrap gap-2" id="pagination-wrapper" style="display: none;">
+        <div class="small fw-bold text-white" id="pagination-info">
+          แสดงรายการที่ 1 ถึง 20 จากทั้งหมด 0 รายการ
+        </div>
+        <div class="d-flex align-items-center gap-1 flex-wrap" id="pagination-buttons">
+          <!-- ปุ่ม << หน้า >> จะถูกสร้างขึ้นที่นี่ -->
+        </div>
+      </div>
+    </div>
+  </div> <!-- ปิด tab-dosing-pane -->
+
+  <!-- ======================================================== -->
+  <!-- TAB 2: ปริมาณสารเคมีในแท็งก์ (Tank Farm Inventory)        -->
+  <!-- ======================================================== -->
+  <div class="tab-pane fade" id="tab-tanks-pane" role="tabpanel" aria-labelledby="tab-tanks-btn">
+
+    <!-- 1. แถบสถานะและการควบคุม Tank Farm -->
+    <div class="scada-panel mb-3">
+      <div class="p-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <span class="badge bg-dark border border-secondary px-3 py-2 text-info fw-semibold">
+            <i class="bi bi-database-check text-success me-1"></i> InfluxDB v2 Cloud
+          </span>
+          <span class="badge bg-dark border border-secondary px-3 py-2 text-light fw-normal">
+            Org: <b class="text-info">PP_Factory</b> | Bucket: <b class="text-warning">tank fram</b>
+          </span>
+          <span class="badge bg-dark border border-secondary px-3 py-2 text-success fw-semibold" id="tank-comm-status">
+            <span class="status-led"></span> เชื่อมต่อสำเร็จ
+          </span>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <span class="badge bg-dark border border-secondary px-3 py-2 text-light" id="tank-last-update-time">
+            <i class="bi bi-clock me-1"></i> ยังไม่ได้โหลดข้อมูล
+          </span>
+          <button class="btn btn-sm btn-primary fw-semibold" onclick="loadTankData(false)">
+            <i class="bi bi-arrow-repeat me-1"></i> รีเฟรชแท็งก์
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. KPI สรุปสถานะฟาร์มแท็งก์ -->
+    <div class="row g-3 mb-3">
+      <div class="col-md-4">
+        <div class="tank-kpi-card">
+          <div class="tank-kpi-icon bg-success bg-opacity-25 text-success border border-success">
+            <i class="bi bi-hdd-stack-fill"></i>
+          </div>
+          <div>
+            <div class="small text-light fw-semibold">จำนวนแท็งก์ทั้งหมด</div>
+            <div class="fs-4 fw-bold text-success"><span id="farm-online-tanks">5</span> / 5 <small class="fs-6 text-light">แท็งก์</small></div>
+            <div class="small text-success">สถานะออนไลน์พร้อมใช้งาน</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="tank-kpi-card">
+          <div class="tank-kpi-icon bg-warning bg-opacity-25 text-warning border border-warning">
+            <i class="bi bi-thermometer-half"></i>
+          </div>
+          <div>
+            <div class="small text-light fw-semibold">อุณหภูมิสารเคมีเฉลี่ย</div>
+            <div class="fs-4 fw-bold text-warning"><span id="farm-avg-temp">--</span> <small class="fs-6 text-light">°C</small></div>
+            <div class="small text-light" id="farm-temp-range">ช่วงอุณหภูมิ: -- - -- °C</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="tank-kpi-card">
+          <div class="tank-kpi-icon bg-info bg-opacity-25 text-info border border-info">
+            <i class="bi bi-shield-check"></i>
+          </div>
+          <div>
+            <div class="small text-light fw-semibold">สถานะระดับสต็อกรวม</div>
+            <div class="fs-5 fw-bold text-success" id="farm-stock-status">อยู่ในเกณฑ์ปกติ</div>
+            <div class="small text-light" id="farm-stock-hint">ไม่มีแท็งก์ที่ระดับต่ำวิกฤต</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. SCADA Mimic 5 Vertical Cylindrical Tanks -->
+    <div class="scada-panel mb-3">
+      <div class="scada-panel-header">
+        <span><i class="bi bi-moisture text-info me-2"></i>SCADA TANK FARM MIMIC</span>
+        <span class="badge bg-primary">Real-time Level & Temperature</span>
+      </div>
+      <div class="p-3">
+        <div class="row g-3 row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-5" id="tank-cards-row">
+          <div class="col-12 text-center py-5 text-light w-100">
+            <div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังโหลดข้อมูลแท็งก์สารเคมีจาก InfluxDB...
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. ส่วนตัวกรองประวัติการเติมและสต็อกย้อนหลัง (Refill & Historical Stock Filter) -->
+    <div class="filter-card">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2 pb-2 border-bottom border-secondary">
+        <span class="fw-bold text-info"><i class="bi bi-funnel-fill me-1"></i> ตัวกรองประวัติการเติมและสต็อกย้อนหลัง (Refill & Stock History Filter)</span>
+        <div class="d-flex gap-1 flex-wrap">
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-date" onclick="setTankQuickDate('today')">วันนี้</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-date" onclick="setTankQuickDate('yesterday')">เมื่อวาน</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-date" onclick="setTankQuickDate('7days')">7 วันล่าสุด</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-date" onclick="setTankQuickDate('15days')">15 วัน</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary btn-quick-date" onclick="setTankQuickDate('30days')">30 วัน</button>
+        </div>
+      </div>
+      <div class="row g-2 align-items-end">
+        <div class="col-md-3">
+          <label class="form-label text-light small mb-1">วันที่เริ่มต้น (Start Date)</label>
+          <input type="date" class="form-control form-control-sm" id="tank-start-date" onchange="filterTankHistory()">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label text-light small mb-1">วันที่สิ้นสุด (End Date)</label>
+          <input type="date" class="form-control form-control-sm" id="tank-end-date" onchange="filterTankHistory()">
+        </div>
+        <div class="col-md-3">
+          <label class="form-label text-light small mb-1">เลือกแท็งก์ / สารเคมี (Chemical)</label>
+          <select class="form-select form-select-sm" id="tank-chem-filter" onchange="filterTankHistory()">
+            <option value="ALL">-- ทุกแท็งก์ (แสดงรวม 5 แท็งก์) --</option>
+            <option value="NaOH50">CAUSTIC SODA 50%</option>
+            <option value="LS9">LS9 (SURFACTANT)</option>
+            <option value="UD1">UD1 (POLYMER)</option>
+            <option value="LAS">LAS (ACID)</option>
+            <option value="DI">DI WATER (น้ำบริสุทธิ์)</option>
+          </select>
+        </div>
+        <div class="col-md-3 d-flex gap-2">
+          <button class="btn btn-sm btn-success w-100 fw-bold" onclick="filterTankHistory()">
+            <i class="bi bi-search me-1"></i> ดึงข้อมูลย้อนหลัง
+          </button>
+          <button class="btn btn-sm btn-outline-secondary" onclick="clearTankHistoryFilter()" title="ล้างค่าตัวกรอง">
+            <i class="bi bi-arrow-counterclockwise"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. กราฟแนวโน้มระดับสต็อกสารเคมีย้อนหลัง (Tank Farm Stock History Trend) -->
+    <div class="scada-panel mb-3">
+      <div class="scada-panel-header flex-wrap gap-2">
+        <span><i class="bi bi-graph-up-arrow text-info me-2"></i>TANK FARM HISTORICAL STOCK TREND (แนวโน้มระดับสต็อกสารเคมีย้อนหลัง)</span>
+        <span class="small fw-semibold text-info" id="tank-trend-period-badge"><i class="bi bi-calendar3 me-1"></i>ช่วงเวลา: 7 วันล่าสุด</span>
+      </div>
+      <div class="p-3">
+        <div style="position: relative; height: 320px;">
+          <canvas id="tankTrendChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. ตารางรายละเอียดสต็อกสารเคมีในแท็งก์ -->
+    <div class="scada-panel mb-3">
+      <div class="scada-panel-header flex-wrap gap-2">
+        <span><i class="bi bi-table text-info me-2"></i>ตารางตรวจสอบสต็อกสารเคมีคงเหลือ (Chemical Tank Inventory Details)</span>
+        <button class="btn btn-sm btn-outline-success py-0 px-2 fw-semibold" onclick="exportTankToExcel()">
+          <i class="bi bi-file-earmark-excel me-1"></i> ส่งออกสต็อกแท็งก์ Excel
+        </button>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-scada table-hover align-middle mb-0" id="tank-inventory-table">
+          <thead>
+            <tr>
+              <th style="width: 50px;">ลำดับ</th>
+              <th class="text-start ps-3">ชื่อถัง / สารเคมี (Tank & Chemical)</th>
+              <th style="width: 150px;">ปริมาณคงเหลือ (L)</th>
+              <th style="width: 140px;">ความจุถัง (L)</th>
+              <th style="width: 140px;">ระดับคงเหลือ (%)</th>
+              <th style="width: 150px;">พื้นที่ว่างรับเพิ่ม (L)</th>
+              <th style="width: 130px;">อุณหภูมิ (°C)</th>
+              <th style="width: 180px;">เวลาตรวจวัดล่าสุด</th>
+              <th style="width: 150px;">สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="9" class="text-center py-4 text-light">
+                <div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังโหลดข้อมูลแท็งก์จาก InfluxDB...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 6. ประวัติการเติมสารเคมีลงแท็งก์ (Chemical Refill History Log) - ย้ายมาไว้ล่างสุด แสดงหน้าละ 20 รายการ -->
+    <div class="scada-panel mb-4">
+      <div class="scada-panel-header flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+          <span><i class="bi bi-fuel-pump-fill text-warning me-2"></i>ประวัติการเติมสารเคมีลงแท็งก์ (Tank Refill History Log)</span>
+          <span class="badge bg-dark border border-secondary text-info fw-normal">
+            เกณฑ์ตรวจจับ: ปริมาณเพิ่มขึ้น <b class="text-warning">≥ 10%</b>
+          </span>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="small fw-semibold text-white" id="refill-count-text">พบ <b class="text-warning fs-6">0</b> รายการ (แสดงหน้าละ 20 รายการ)</span>
+          <button class="btn btn-sm btn-outline-success py-0 px-2 fw-semibold" onclick="exportRefillToExcel()">
+            <i class="bi bi-file-earmark-excel me-1"></i> ส่งออกประวัติการเติม Excel
+          </button>
+        </div>
+      </div>
+
+      <!-- สรุปตัวเลขสถิติการเติม -->
+      <div class="p-3 pb-0">
+        <div class="row g-3 mb-3">
+          <div class="col-md-4">
+            <div class="tank-kpi-card py-2">
+              <div class="tank-kpi-icon bg-warning bg-opacity-25 text-warning border border-warning" style="width: 42px; height: 42px; font-size: 20px;">
+                <i class="bi bi-fuel-pump-fill"></i>
+              </div>
+              <div>
+                <div class="small text-light fw-semibold">จำนวนครั้งที่เติมสารเคมี</div>
+                <div class="fs-5 fw-bold text-white"><span id="refill-total-times">0</span> <small class="fs-6 text-light">ครั้ง</small></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="tank-kpi-card py-2">
+              <div class="tank-kpi-icon bg-success bg-opacity-25 text-success border border-success" style="width: 42px; height: 42px; font-size: 20px;">
+                <i class="bi bi-droplet-half"></i>
+              </div>
+              <div>
+                <div class="small text-light fw-semibold">ปริมาณรับเข้าสะสมรวม</div>
+                <div class="fs-5 fw-bold text-success"><span id="refill-total-vol">0</span> <small class="fs-6 text-light">L</small></div>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="tank-kpi-card py-2">
+              <div class="tank-kpi-icon bg-info bg-opacity-25 text-info border border-info" style="width: 42px; height: 42px; font-size: 20px;">
+                <i class="bi bi-clock-history"></i>
+              </div>
+              <div>
+                <div class="small text-light fw-semibold">การเติมครั้งล่าสุด</div>
+                <div class="fs-6 fw-bold text-info" id="refill-latest-info">ไม่มีข้อมูล</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ตารางรายการประวัติการเติมสารเคมี -->
+      <div class="table-responsive">
+        <table class="table table-scada table-hover align-middle mb-0" id="refill-history-table">
+          <thead>
+            <tr>
+              <th style="width: 50px;">ลำดับ</th>
+              <th style="width: 170px;">วัน-เวลา เริ่มเติม (Start)</th>
+              <th style="width: 130px;">เวลาเสร็จสิ้น (End)</th>
+              <th style="width: 110px;">ระยะเวลา</th>
+              <th class="text-start ps-3">แท็งก์ / สารเคมี (Tank)</th>
+              <th style="width: 140px;">ก่อนเติม (L)</th>
+              <th style="width: 140px;">หลังเติม (L)</th>
+              <th style="width: 160px;">ปริมาณที่เติม (+L)</th>
+              <th style="width: 130px;">% ที่เพิ่มขึ้น</th>
+              <th style="width: 150px;">สถานะ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td colspan="10" class="text-center py-4 text-light">
+                <div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังประมวลผลข้อมูลการเติมสารเคมีจาก InfluxDB...
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- แถบเลื่อนหน้า Pagination สำหรับประวัติการเติม << หน้า >> -->
+      <div class="p-3 bg-dark bg-opacity-75 border-top border-secondary d-flex justify-content-between align-items-center flex-wrap gap-2" id="refill-pagination-wrapper" style="display: none;">
+        <div class="small fw-bold text-white" id="refill-pagination-info">
+          แสดงรายการที่ 1 ถึง 20 จากทั้งหมด 0 รายการ
+        </div>
+        <div class="d-flex align-items-center gap-1 flex-wrap" id="refill-pagination-buttons">
+          <!-- ปุ่ม << หน้า >> สำหรับประวัติการเติมจะถูกสร้างขึ้นที่นี่ -->
+        </div>
+      </div>
+    </div>
+
+  </div> <!-- ปิด tab-tanks-pane -->
+
+</div> <!-- ปิด scadaMainTabsContent -->
+
+</div> <!-- ปิด container-fluid -->
+
+  <!-- Modal สำหรับตั้งค่า % ผลต่าง (Tolerance %) ซิงค์ข้อมูลกับ Google Sheet / ทุกเครื่อง -->
+  <div class="modal fade" id="toleranceModal" tabindex="-1" aria-labelledby="toleranceModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content bg-dark text-white border border-secondary shadow-lg">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title fs-6 fw-bold text-info" id="toleranceModalLabel">
+            <i class="bi bi-sliders me-2"></i>ตั้งค่าเกณฑ์ % ผลต่างยอมรับได้ (Diff Tolerance)
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="small text-light mb-3">
+            กำหนด % ผลต่าง (Diff) ที่ยอมรับได้ สำหรับจำแนกสถานะ <span class="badge bg-success-subtle text-success border border-success">อยู่ในเกณฑ์ยอมรับ</span> หรือ <span class="badge bg-danger-subtle text-danger border border-danger">เกินเกณฑ์ที่ยอมรับ</span><br>
+            <span class="text-warning"><i class="bi bi-broadcast me-1"></i><b>ระบบซิงค์ส่วนกลาง:</b> เมื่อใครเปลี่ยนค่านี้ ค่าจะบันทึกลงชีต และผู้ใช้งานคนอื่นทั้งหมดจะอัปเดตใช้ค่าเดียวกันทันที</span>
+          </p>
+          <div class="mb-3">
+            <label class="form-label text-light fw-semibold">เกณฑ์ % ผลต่างที่ยอมรับได้ (± %)</label>
+            <div class="input-group">
+              <span class="input-group-text bg-secondary text-white border-secondary">±</span>
+              <input type="number" step="0.1" min="0.1" max="50" class="form-control text-center fs-5 fw-bold text-warning bg-black border-secondary" id="input-tolerance" value="1.0">
+              <span class="input-group-text bg-secondary text-white border-secondary">%</span>
+            </div>
+            <div class="form-text text-light small mt-2">
+              ตัวอย่าง: ตั้งค่า ±1.0% หาก Target 200 kg ผลต่างยอมรับได้คือ ±2.0 kg
+            </div>
+          </div>
+          <div class="d-flex gap-2 justify-content-center">
+            <button type="button" class="btn btn-sm btn-outline-secondary text-white px-3" onclick="document.getElementById('input-tolerance').value='0.5'">0.5%</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary text-white px-3" onclick="document.getElementById('input-tolerance').value='1.0'">1.0%</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary text-white px-3" onclick="document.getElementById('input-tolerance').value='2.0'">2.0%</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary text-white px-3" onclick="document.getElementById('input-tolerance').value='5.0'">5.0%</button>
+          </div>
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">ยกเลิก</button>
+          <button type="button" class="btn btn-sm btn-success fw-bold px-3" id="btn-save-tolerance" onclick="saveTolerance()">
+            <i class="bi bi-check-circle me-1"></i> บันทึกและซิงค์ทุกคน
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- โหลด Bootstrap 5 JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+  <script>
+    // URL ของ Google Apps Script Web App
+    const WEB_APP_URL = "https://script.google.com/macros/s/AKfycbypaCUR6SFtNcLl1X4fti6yLZXWvic1h01S2cRS9wgJMzUAx82tOhnXd3yWu1J4DVbtcA/exec";
+
+    function getWebAppUrl() {
+      return WEB_APP_URL;
+    }
+
+    // ตัวแปรเก็บข้อมูลและกราฟระบบแบ่งจ่ายเคมี
+    let rawData = [];
+    let barChartInstance = null;
+    let trendChartInstance = null;
+    let autoRefreshTimer = null;
+    let currentTolerancePercent = 1.0; // ค่าเริ่มต้นเกณฑ์ % ผลต่าง
+
+    // ========================================================
+    // การตั้งค่า InfluxDB Cloud และสเปกแท็งก์สารเคมี (Tank Farm)
+    // ========================================================
+    const INFLUX_CONFIG = {
+      url: "https://influxdb-2-jxoj.srv1370657.hstgr.cloud",
+      token: "2mhFfgP3IM3D3s0kptYjHU8JJiC_nKhgfEkxSeLNh89LrKKQCKjcTmqnN3iF487SYMz4lAWI-MAJzay_Gv8m_A==",
+      org: "PP_Factory",
+      bucket: "tank fram",
+      measurement: "Tank"
+    };
+
+    const TANK_SPECS = {
+      'NaOH50': {
+        id: 'NaOH50',
+        name: 'CAUSTIC SODA 50%',
+        shortName: 'NaOH 50%',
+        maxCapacity: 20000,
+        color: '#f59e0b',
+        colorGrad: 'linear-gradient(180deg, #fbbf24 0%, #d97706 100%)',
+        textColor: '#fbbf24',
+        icon: '🧪'
+      },
+      'LS9': {
+        id: 'LS9',
+        name: 'LS9 (SURFACTANT)',
+        shortName: 'LS9',
+        maxCapacity: 20000,
+        color: '#38bdf8',
+        colorGrad: 'linear-gradient(180deg, #38bdf8 0%, #0284c7 100%)',
+        textColor: '#38bdf8',
+        icon: '🫧'
+      },
+      'UD1': {
+        id: 'UD1',
+        name: 'UD1 (POLYMER)',
+        shortName: 'UD1',
+        maxCapacity: 20000,
+        color: '#10b981',
+        colorGrad: 'linear-gradient(180deg, #34d399 0%, #059669 100%)',
+        textColor: '#34d399',
+        icon: '🧬'
+      },
+      'LAS': {
+        id: 'LAS',
+        name: 'LAS (ACID)',
+        shortName: 'LAS',
+        maxCapacity: 20000,
+        color: '#a855f7',
+        colorGrad: 'linear-gradient(180deg, #c084fc 0%, #7c3aed 100%)',
+        textColor: '#c084fc',
+        icon: '⚡'
+      },
+      'DI': {
+        id: 'DI',
+        name: 'DI WATER (น้ำบริสุทธิ์)',
+        shortName: 'DI Water',
+        maxCapacity: 10000,
+        color: '#06b6d4',
+        colorGrad: 'linear-gradient(180deg, #22d3ee 0%, #0891b2 100%)',
+        textColor: '#22d3ee',
+        icon: '💧'
+      }
+    };
+
+    let latestTankData = null;
+    let tankTrendChartInstance = null;
+    let isTankDataLoaded = false;
+    let detectedRefillEvents = [];
+    let tankHistoryPoints = {};
+
+    window.onload = function() {
+      startLiveClock();
+      loadData(false);
+      
+      // ตั้งค่าตัวกรองประวัติแท็งก์เริ่มต้นเป็น 7 วันล่าสุด และโหลดข้อมูลแท็งก์ล่วงหน้า
+      initTankHistoryDates();
+      loadTankData(true);
+      filterTankHistory();
+
+      // เริ่มต้น Auto-Refresh 30 วินาทีตามค่าเริ่มต้นของ Select
+      var autoVal = document.getElementById('auto-refresh-select') ? document.getElementById('auto-refresh-select').value : '30';
+      toggleAutoRefresh(autoVal);
+
+      // เมื่อผู้ใช้กดสลับมาแท็บแท็งก์ ให้ Chart.js ปรับขนาดให้เต็มหน้าจอพอดี
+      var tankTabBtn = document.getElementById('tab-tanks-btn');
+      if (tankTabBtn) {
+        tankTabBtn.addEventListener('shown.bs.tab', function () {
+          if (tankTrendChartInstance) {
+            tankTrendChartInstance.resize();
+          }
+        });
+      }
+    };
+
+    // อัปเดตตัวเลขแสดงผลของเกณฑ์ % บน Navbar
+    function updateToleranceBadge(val) {
+      var badge = document.getElementById('current-tolerance-badge');
+      if (badge) badge.innerText = '±' + Number(val).toFixed(1) + '%';
+      var input = document.getElementById('input-tolerance');
+      if (input && document.activeElement !== input) input.value = Number(val).toFixed(1);
+    }
+
+    // เปิดหน้าต่าง Modal ตั้งค่าเกณฑ์ %
+    function openToleranceModal() {
+      var input = document.getElementById('input-tolerance');
+      if (input) input.value = currentTolerancePercent.toFixed(1);
+      var modalEl = document.getElementById('toleranceModal');
+      var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      modal.show();
+    }
+
+    // บันทึกการตั้งค่า % ผลต่างลง Google Sheet และซิงค์ทุกคน
+    function saveTolerance() {
+      var val = parseFloat(document.getElementById('input-tolerance').value);
+      if (isNaN(val) || val <= 0) {
+        alert('กรุณาระบุตัวเลขเกณฑ์ % ที่มากกว่า 0');
+        return;
+      }
+
+      var btn = document.getElementById('btn-save-tolerance');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> กำลังบันทึก...';
+
+      var url = getWebAppUrl();
+      var sep = url.indexOf('?') > -1 ? '&' : '?';
+      var saveUrl = url + sep + 'action=setTolerance&val=' + encodeURIComponent(val);
+
+      fetch(saveUrl)
+        .then(function(res) {
+          if (!res.ok) throw new Error('HTTP Status ' + res.status);
+          return res.json();
+        })
+        .then(function(res) {
+          finishSave(val);
+        })
+        .catch(function(err) {
+          saveToleranceJsonp(saveUrl, val, finishSave, function(e) {
+            alert('เกิดข้อผิดพลาดในการบันทึก: ' + e);
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> บันทึกและซิงค์ทุกคน';
+          });
         });
 
-        // ปุ่มรีเฟรชข้อมูล
-        document.getElementById('loadSheetBtn').addEventListener('click', function() {
-            fetchDataFromUrl(document.getElementById('sheetUrlInput').value);
+      function finishSave(newVal) {
+        currentTolerancePercent = newVal;
+        updateToleranceBadge(newVal);
+        var modalEl = document.getElementById('toleranceModal');
+        var modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> บันทึกและซิงค์ทุกคน';
+        filterData(); // คำนวณสีและสถานะตารางใหม่ทันทีด้วยเกณฑ์ใหม่
+      }
+    }
+
+    function saveToleranceJsonp(url, val, onSuccessCb, onErrorCb) {
+      var callbackName = 'gasToleranceCallback_' + Math.round(100000 * Math.random());
+      var script = document.createElement('script');
+      var sep = url.indexOf('?') > -1 ? '&' : '?';
+      script.src = url + sep + 'callback=' + callbackName;
+
+      var timer = setTimeout(function() {
+        cleanup();
+        onErrorCb('หมดเวลาเชื่อมต่อ (Timeout)');
+      }, 10000);
+
+      window[callbackName] = function(res) {
+        clearTimeout(timer);
+        cleanup();
+        onSuccessCb(val);
+      };
+
+      function cleanup() {
+        if (script.parentNode) script.parentNode.removeChild(script);
+        delete window[callbackName];
+      }
+
+      script.onerror = function() {
+        clearTimeout(timer);
+        cleanup();
+        onErrorCb('Network Script Error');
+      };
+
+      document.body.appendChild(script);
+    }
+
+    // ระบบรีเฟรชข้อมูลอัตโนมัติ (SCADA Auto-Sync)
+    function toggleAutoRefresh(seconds) {
+      if (autoRefreshTimer) {
+        clearInterval(autoRefreshTimer);
+        autoRefreshTimer = null;
+      }
+      var sec = parseInt(seconds, 10);
+      if (sec > 0) {
+        autoRefreshTimer = setInterval(function() {
+          loadData(true); // รีเฟรชข้อมูลระบบแบ่งจ่ายแบบเงียบ
+          loadTankData(true); // รีเฟรชข้อมูลระดับแท็งก์สารเคมีแบบเงียบ
+        }, sec * 1000);
+      }
+    }
+
+    // นาฬิกาดิจิทัล
+    function startLiveClock() {
+      function update() {
+        var now = new Date();
+        var h = String(now.getHours()).padStart(2, '0');
+        var m = String(now.getMinutes()).padStart(2, '0');
+        var s = String(now.getSeconds()).padStart(2, '0');
+        document.getElementById('live-clock').innerText = h + ':' + m + ':' + s;
+      }
+      update();
+      setInterval(update, 1000);
+    }
+
+    // ฟังก์ชันดึงข้อมูลจาก API ระบบ
+    function loadData(isSilent) {
+      document.getElementById('comm-status').innerText = 'กำลังซิงค์...';
+      document.getElementById('comm-status').className = 'text-warning';
+
+      // ถ้าเป็นการกดโหลดครั้งแรก หรือกดปุ่มรีเฟรชเอง ให้แสดงตัวหมุนโหลดข้อมูล
+      if (!isSilent || !rawData || rawData.length === 0) {
+        document.querySelector('#detail-table tbody').innerHTML = '<tr><td colspan="8" class="text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div>กำลังซิงค์ข้อมูลระบบ (Synchronizing System Data)...</td></tr>';
+        document.querySelector('#summary-table tbody').innerHTML = '<tr><td colspan="7" class="text-center py-3 text-light">กำลังประมวลผลสรุปยอดการใช้งาน...</td></tr>';
+        document.getElementById('latest-cards-container').innerHTML = '<div class="col-12 text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังซิงค์สถานะสถานีตาชั่ง (Station Mimic)...</div>';
+        var chemUsageRow = document.getElementById('chemical-usage-cards-row');
+        if (chemUsageRow) chemUsageRow.innerHTML = '<div class="col-12 text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังประมวลผลข้อมูลยอดการใช้งานเคมี...</div>';
+      }
+
+      var url = getWebAppUrl();
+
+      fetch(url)
+        .then(function(res) {
+          if (!res.ok) throw new Error('HTTP Status ' + res.status);
+          return res.json();
+        })
+        .then(function(data) {
+          onSuccess(data);
+        })
+        .catch(function(err) {
+          fetchJsonpFallback(url, err);
+        });
+    }
+
+    function fetchJsonpFallback(url, originalError) {
+      var callbackName = 'gasCallback_' + Math.round(100000 * Math.random());
+      var script = document.createElement('script');
+      var sep = url.indexOf('?') > -1 ? '&' : '?';
+      script.src = url + sep + 'callback=' + callbackName;
+
+      var timer = setTimeout(function() {
+        cleanup();
+        onError(originalError);
+      }, 10000);
+
+      window[callbackName] = function(data) {
+        clearTimeout(timer);
+        cleanup();
+        onSuccess(data);
+      };
+
+      function cleanup() {
+        if (script.parentNode) script.parentNode.removeChild(script);
+        delete window[callbackName];
+      }
+
+      script.onerror = function() {
+        clearTimeout(timer);
+        cleanup();
+        onError(originalError);
+      };
+
+      document.body.appendChild(script);
+    }
+
+    function onSuccess(data) {
+      document.getElementById('comm-status').innerText = 'ออนไลน์';
+      document.getElementById('comm-status').className = 'text-success';
+      document.getElementById('last-update-time').innerText = 'อัปเดต: ' + new Date().toLocaleTimeString('th-TH');
+
+      var rows = [];
+      if (Array.isArray(data)) {
+        rows = data;
+      } else if (data && typeof data === 'object') {
+        if (data.tolerancePercent !== undefined) {
+          currentTolerancePercent = parseFloat(data.tolerancePercent) || 1.0;
+          updateToleranceBadge(currentTolerancePercent);
+        }
+        rows = Array.isArray(data.rows) ? data.rows : [];
+      }
+
+      if (!rows || rows.length <= 1) {
+        document.querySelector('#detail-table tbody').innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">ยังไม่มีข้อมูลในชีต</td></tr>';
+        document.querySelector('#summary-table tbody').innerHTML = '<tr><td colspan="7" class="text-center py-3 text-muted">ยังไม่มีข้อมูล</td></tr>';
+        document.getElementById('latest-cards-container').innerHTML = '<div class="col-12 text-center py-3 text-muted">ยังไม่มีข้อมูลการชั่งในระบบ</div>';
+        return;
+      }
+
+      rawData = rows.slice(1);
+
+      // สร้างการ์ดแสดงการใช้งานล่าสุดของแต่ละตาชั่ง (SCADA Mimic Cards)
+      renderLatestCards(rawData);
+
+      // สร้างตัวเลือก Dropdown สารเคมี
+      buildFilterDropdowns(rawData);
+
+      // คำนวณสรุปข้อมูล, กราฟ, และตาราง
+      filterData();
+    }
+
+    function onError(error) {
+      document.getElementById('comm-status').innerText = 'ออฟไลน์';
+      document.getElementById('comm-status').className = 'text-danger';
+      var msg = error && error.message ? error.message : String(error);
+      document.querySelector('#detail-table tbody').innerHTML = 
+        '<tr><td colspan="8" class="text-center py-4 text-danger">' +
+        'เกิดข้อผิดพลาดในการดึงข้อมูล: ' + msg + '<br>' +
+        '<small class="text-light">กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตหรือสถานะเซิร์ฟเวอร์ระบบ</small>' +
+        '</td></tr>';
+      document.getElementById('latest-cards-container').innerHTML = '<div class="col-12 text-center py-3 text-danger">ไม่สามารถโหลดข้อมูลได้</div>';
+    }
+
+    // ฟังก์ชันช่วยจำแนกชื่อสารเคมีและโหมด
+    function parseScaleInfo(fullName) {
+      var str = String(fullName || '').trim();
+      var mode = "Unknown";
+      if (str.indexOf("Mode Weight") > -1) {
+        mode = "Mode Weight";
+      } else if (str.indexOf("Mode Timer") > -1) {
+        mode = "Mode Timer";
+      }
+
+      var chemical = "Other";
+      if (str.indexOf("CAUSTIC") > -1) {
+        chemical = "CAUSTIC SODA 50%";
+      } else if (str.indexOf("LS9") > -1) {
+        chemical = "LS9";
+      } else if (str.indexOf("UD1") > -1) {
+        chemical = "UD1";
+      } else if (str.indexOf("LAS") > -1) {
+        chemical = "LAS";
+      } else {
+        chemical = str.replace(/Mode\s+(Weight|Timer)\s*/i, '').trim() || str;
+      }
+
+      return {
+        fullName: str,
+        mode: mode,
+        chemical: chemical
+      };
+    }
+
+    // 1. การ์ดการใช้งานล่าสุดของแต่ละตาชั่ง สไตล์ SCADA Mimic
+    function renderLatestCards(rows) {
+      var container = document.getElementById('latest-cards-container');
+      var latestMap = {};
+
+      for (var i = rows.length - 1; i >= 0; i--) {
+        var r = rows[i];
+        var scaleName = String(r[4] || '').trim();
+        if (scaleName && !latestMap[scaleName]) {
+          latestMap[scaleName] = {
+            timestamp: r[0],
+            target: r[1],
+            resulting: r[2],
+            actual: r[3],
+            name: scaleName
+          };
+        }
+      }
+
+      var scaleKeys = Object.keys(latestMap);
+      if (scaleKeys.length === 0) {
+        container.innerHTML = '<div class="col-12 text-center py-3 text-muted">ยังไม่มีข้อมูลการชั่ง</div>';
+        return;
+      }
+
+      var html = '';
+      scaleKeys.sort().forEach(function(scale) {
+        var item = latestMap[scale];
+        var scaleInfo = parseScaleInfo(item.name);
+        var dateObj = parseDateSafe(item.timestamp);
+        var dateStr = dateObj ? formatDateTime(dateObj) : (item.timestamp || '-');
+
+        var targetNum = parseCleanNum(item.target);
+        var actualNum = (!isNaN(parseCleanNum(item.actual))) ? parseCleanNum(item.actual) : parseCleanNum(item.resulting);
+        var diffHtml = '<span class="text-muted">-</span>';
+        var percent = 0;
+
+        if (!isNaN(targetNum) && !isNaN(actualNum)) {
+          var diff = actualNum - targetNum;
+          var sign = diff > 0 ? '+' : '';
+          var diffPct = targetNum > 0 ? (Math.abs(diff) / targetNum) * 100 : 0;
+          var isNormal = targetNum > 0 ? (diffPct <= currentTolerancePercent) : (Math.abs(diff) <= 0.5);
+          var diffColor = isNormal ? '#10b981' : (diff > 0 ? '#ef4444' : '#f59e0b');
+          var pctText = targetNum > 0 ? ' (' + (diff > 0 ? '+' : '') + diffPct.toFixed(1) + '%)' : '';
+          diffHtml = '<span style="color:' + diffColor + '; font-weight: bold;">' + sign + diff.toFixed(2) + ' kg' + pctText + '</span>';
+
+          if (targetNum > 0) {
+            percent = Math.min(100, Math.max(0, (actualNum / targetNum) * 100));
+          }
+        }
+
+        var modeBadgeClass = scaleInfo.mode === 'Mode Weight' ? 'bg-success' : 'bg-primary';
+
+        html += '<div class="col-md-6 col-lg-4 col-xl">';
+        html += '  <div class="station-mimic-card">';
+        html += '    <div class="d-flex justify-content-between align-items-center mb-1">';
+        html += '      <span class="fw-bold text-white text-truncate" title="' + item.name + '">🧪 ' + scaleInfo.chemical + '</span>';
+        html += '      <span class="badge ' + modeBadgeClass + ' small">' + scaleInfo.mode + '</span>';
+        html += '    </div>';
+        html += '    <div class="small mb-2 fw-semibold" style="color: #93c5fd;"><i class="bi bi-clock me-1"></i>' + dateStr + '</div>';
+
+        // หน้าปัด Target vs Actual
+        html += '    <div class="row g-2 mb-2">';
+        html += '      <div class="col-6">';
+        html += '        <div class="readout-box readout-target">';
+        html += '          <div class="readout-label">TARGET (SV)</div>';
+        html += '          <div class="readout-value">' + (item.target !== undefined && item.target !== "" ? item.target : '-') + ' <small class="fs-6 fw-normal">kg</small></div>';
+        html += '        </div>';
+        html += '      </div>';
+        var actualDisp = (item.actual !== undefined && item.actual !== "") ? item.actual : (item.resulting !== undefined && item.resulting !== "" ? item.resulting : '-');
+        html += '      <div class="col-6">';
+        html += '        <div class="readout-box readout-actual">';
+        html += '          <div class="readout-label">ACTUAL (PV)</div>';
+        html += '          <div class="readout-value">' + actualDisp + ' <small class="fs-6 fw-normal">kg</small></div>';
+        html += '        </div>';
+        html += '      </div>';
+        html += '    </div>';
+
+        // เกจความคืบหน้า
+        html += '    <div class="d-flex justify-content-between small text-white fw-semibold">';
+        html += '      <span style="color: #cbd5e1;">BATCH RATIO</span>';
+        html += '      <span class="text-info fw-bold">' + percent.toFixed(1) + '%</span>';
+        html += '    </div>';
+        html += '    <div class="scada-progress">';
+        html += '      <div class="scada-progress-bar" style="width: ' + percent + '%;"></div>';
+        html += '    </div>';
+
+        // Footer: Resulting & Diff
+        var statusTag = (!isNaN(targetNum) && !isNaN(actualNum)) ? (isNormal ? '<span class="badge bg-success-subtle text-success border border-success py-0 px-1 ms-1">อยู่ในเกณฑ์ยอมรับ</span>' : '<span class="badge bg-danger-subtle text-danger border border-danger py-0 px-1 ms-1">เกินเกณฑ์ที่ยอมรับ</span>') : '';
+        html += '    <div class="d-flex justify-content-between small pt-2 border-top border-secondary mt-2 text-white">';
+        html += '      <span style="color: #cbd5e1;">Resulting: <b class="text-white">' + (item.resulting !== undefined && item.resulting !== "" ? item.resulting : '-') + '</b></span>';
+        html += '      <span>ผลต่าง: ' + diffHtml + statusTag + '</span>';
+        html += '    </div>';
+
+        html += '  </div>';
+        html += '</div>';
+      });
+
+      container.innerHTML = html;
+    }
+
+    function buildFilterDropdowns(rows) {
+      var chemSelect = document.getElementById('chemical-filter');
+      var currentChem = chemSelect.value;
+      var chemicals = { "CAUSTIC SODA 50%": true, "LS9": true, "UD1": true, "LAS": true };
+
+      rows.forEach(function(r) {
+        var info = parseScaleInfo(r[4]);
+        if (info.chemical && info.chemical !== 'Other') {
+          chemicals[info.chemical] = true;
+        }
+      });
+
+      chemSelect.innerHTML = '<option value="ALL">-- ทุกสารเคมี (แสดงรวม) --</option>';
+      Object.keys(chemicals).sort().forEach(function(c) {
+        var opt = document.createElement('option');
+        opt.value = c;
+        opt.textContent = c;
+        chemSelect.appendChild(opt);
+      });
+
+      if (currentChem && (currentChem === 'ALL' || chemicals[currentChem])) {
+        chemSelect.value = currentChem;
+      }
+    }
+
+    function filterData() {
+      if (!rawData || rawData.length === 0) return;
+
+      var startStr = document.getElementById('start-date').value;
+      var endStr = document.getElementById('end-date').value;
+      var selectedChemical = document.getElementById('chemical-filter').value;
+      var selectedMode = document.getElementById('mode-filter').value;
+
+      var startDate = startStr ? new Date(startStr + 'T00:00:00') : null;
+      var endDate = endStr ? new Date(endStr + 'T23:59:59') : null;
+
+      var statusParts = [];
+      if (startStr && endStr) statusParts.push(startStr + ' ถึง ' + endStr);
+      else if (startStr) statusParts.push('ตั้งแต่ ' + startStr);
+      else if (endStr) statusParts.push('ถึง ' + endStr);
+      else statusParts.push('ทุกช่วงเวลา');
+
+      if (selectedChemical !== 'ALL') statusParts.push('เคมี: ' + selectedChemical);
+      if (selectedMode !== 'ALL') statusParts.push('โหมด: ' + selectedMode);
+
+      document.getElementById('filter-status').innerText = statusParts.join(' | ');
+
+      var filtered = rawData.filter(function(row) {
+        var info = parseScaleInfo(row[4]);
+
+        if (selectedChemical !== 'ALL' && info.chemical !== selectedChemical) {
+          return false;
+        }
+
+        if (selectedMode !== 'ALL' && info.mode !== selectedMode) {
+          return false;
+        }
+
+        var rowDate = parseDateSafe(row[0]);
+        if (rowDate) {
+          if (startDate && rowDate < startDate) return false;
+          if (endDate && rowDate > endDate) return false;
+        }
+
+        return true;
+      });
+
+      renderSummaryTableAndCharts(filtered, selectedMode, selectedChemical);
+      renderDetailTable(filtered);
+    }
+
+    // สรุปยอดและวาดกราฟ SCADA ทั้ง 2 ตัว
+    function renderSummaryTableAndCharts(rows, selectedMode, selectedChemical) {
+      var tbody = document.querySelector('#summary-table tbody');
+      var chemMap = {};
+
+      var grandBatches = 0;
+      var grandTarget = 0;
+      var grandActual = 0;
+
+      // ปรับเปลี่ยนหัวตารางและชื่อตามเงื่อนไขตัวกรองโหมด
+      var isAllModes = (selectedMode === 'ALL');
+      var colNameEl = document.getElementById('summary-col-name');
+      var panelTitleEl = document.getElementById('summary-panel-title');
+      var barTitleEl = document.getElementById('barchart-title');
+
+      if (isAllModes) {
+        colNameEl.innerText = 'ชื่อสารเคมี (รวมทุกโหมด)';
+        panelTitleEl.innerText = 'สรุปปริมาณการใช้งานเคมีแต่ละตัว (รวมทุกโหมด)';
+        barTitleEl.innerText = 'ปริมาณเคมีแต่ละตัวที่ใช้งานจริงรวม (Total Chemical Used kg)';
+      } else {
+        colNameEl.innerText = 'ชื่อสารเคมี (' + selectedMode + ')';
+        panelTitleEl.innerText = 'สรุปปริมาณการใช้งานเคมี (เฉพาะ ' + selectedMode + ')';
+        barTitleEl.innerText = 'ปริมาณเคมีที่ใช้งานจริงรวม (' + selectedMode + ')';
+      }
+
+      rows.forEach(function(r) {
+        var info = parseScaleInfo(r[4]);
+        // ถ้าไม่ได้เลือกโหมด ให้จัดกลุ่มตามชื่อสารเคมีเป็นหลัก (รวมโหมด Weight และ Timer เข้าด้วยกัน)
+        var key = info.chemical;
+        var target = parseCleanNum(r[1]) || 0;
+        var actual = (!isNaN(parseCleanNum(r[3]))) ? parseCleanNum(r[3]) : (parseCleanNum(r[2]) || 0);
+
+        if (!chemMap[key]) {
+          chemMap[key] = {
+            chemical: info.chemical,
+            batches: 0,
+            targetTotal: 0,
+            actualTotal: 0
+          };
+        }
+
+        chemMap[key].batches++;
+        chemMap[key].targetTotal += target;
+        chemMap[key].actualTotal += actual;
+
+        grandBatches++;
+        grandTarget += target;
+        grandActual += actual;
+      });
+
+      var chemKeys = Object.keys(chemMap);
+      if (chemKeys.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-3 text-light">ไม่พบข้อมูลตามช่วงเวลาและเงื่อนไขที่เลือก</td></tr>';
+        var container = document.getElementById('chemical-usage-cards-row');
+        if (container) container.innerHTML = '<div class="col-12 text-center py-4 text-light">ไม่พบข้อมูลการใช้งานสารเคมีตามช่วงเวลาที่เลือก</div>';
+        if (barChartInstance) barChartInstance.destroy();
+        if (trendChartInstance) trendChartInstance.destroy();
+        return;
+      }
+
+      var html = '';
+      chemKeys.sort().forEach(function(name, index) {
+        var item = chemMap[name];
+        var diff = item.actualTotal - item.targetTotal;
+        var avg = item.batches > 0 ? (item.actualTotal / item.batches) : 0;
+        var diffSign = diff > 0 ? '+' : '';
+        var diffColor = Math.abs(diff) <= 0.5 ? '#10b981' : (diff > 0 ? '#ef4444' : '#38bdf8');
+
+        html += '<tr>';
+        html += '<td class="col-idx">' + (index + 1) + '</td>';
+        html += '<td class="fw-bold text-white text-start ps-3"><span class="text-info me-1">🧪</span> ' + item.chemical + '</td>';
+        html += '<td class="text-num text-info fw-bold">' + item.batches.toLocaleString() + '</td>';
+        html += '<td class="text-num fw-bold" style="color: #ff9800 !important;">' + item.targetTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td>';
+        html += '<td class="text-num fw-bold" style="color: #00e676 !important;">' + item.actualTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td>';
+        html += '<td class="text-num fw-bold" style="color:' + diffColor + ' !important;">' + diffSign + diff.toFixed(2) + '</td>';
+        html += '<td class="text-num fw-semibold" style="color: #ffffff !important;">' + avg.toFixed(2) + '</td>';
+        html += '</tr>';
+      });
+
+      tbody.innerHTML = html;
+
+      // แสดงการ์ดสรุปยอดการใช้งานสารเคมีแต่ละชนิด (Chemical Usage Summary Cards)
+      renderChemicalUsageCards(chemMap, grandBatches, grandTarget, grandActual);
+
+      // วาดกราฟ
+      renderBarChart(chemMap);
+      renderTrendChart(rows);
+    }
+
+    // ฟังก์ชันสร้างการ์ดสรุปยอดการใช้งานสารเคมีแต่ละตัวตามช่วงเวลา
+    function renderChemicalUsageCards(chemMap, grandBatches, grandTarget, grandActual) {
+      var container = document.getElementById('chemical-usage-cards-row');
+      if (!container) return;
+
+      var filterHintEl = document.getElementById('chem-cards-filter-hint');
+      var filterStatusEl = document.getElementById('filter-status');
+      if (filterHintEl && filterStatusEl) {
+        filterHintEl.innerText = 'ช่วงเวลา: ' + filterStatusEl.innerText.replace('ช่วงเวลา: ', '');
+      }
+
+      var chemKeys = Object.keys(chemMap).sort();
+      if (chemKeys.length === 0) {
+        container.innerHTML = '<div class="col-12 text-center py-4 text-light">ไม่พบข้อมูลการใช้งานเคมีในช่วงเวลาที่เลือก</div>';
+        return;
+      }
+
+      var icons = {
+        'CAUSTIC SODA 50%': '🧪',
+        'LS9': '🫧',
+        'UD1': '🧬',
+        'LAS': '⚡',
+        'DI': '💧'
+      };
+
+      var colors = {
+        'CAUSTIC SODA 50%': '#f59e0b',
+        'LS9': '#38bdf8',
+        'UD1': '#10b981',
+        'LAS': '#a855f7',
+        'DI': '#06b6d4'
+      };
+
+      var html = '';
+
+      // 1. สร้างการ์ดสำหรับสารเคมีแต่ละตัว
+      chemKeys.forEach(function(k) {
+        var item = chemMap[k];
+        var icon = icons[item.chemical] || '⚗️';
+        var themeColor = colors[item.chemical] || '#38bdf8';
+        var diff = item.actualTotal - item.targetTotal;
+        var diffSign = diff > 0 ? '+' : '';
+        var diffColor = Math.abs(diff) <= 0.5 ? '#10b981' : (diff > 0 ? '#ef4444' : '#38bdf8');
+        var avg = item.batches > 0 ? (item.actualTotal / item.batches) : 0;
+        var ratio = item.targetTotal > 0 ? (item.actualTotal / item.targetTotal * 100) : 100;
+        var diffPct = item.targetTotal > 0 ? (Math.abs(diff) / item.targetTotal * 100) : 0;
+        var isNormal = item.targetTotal > 0 ? (diffPct <= currentTolerancePercent) : (Math.abs(diff) <= 0.5);
+
+        var statusBadge = isNormal 
+          ? '<span class="badge bg-success-subtle text-success border border-success py-1 px-2"><i class="bi bi-check-circle me-1"></i>อยู่ในเกณฑ์</span>'
+          : '<span class="badge bg-danger-subtle text-danger border border-danger py-1 px-2"><i class="bi bi-exclamation-triangle me-1"></i>เกินเกณฑ์</span>';
+
+        html += '<div class="col">' +
+          '<div class="chem-usage-card h-100">' +
+            '<div class="d-flex justify-content-between align-items-center mb-1">' +
+              '<div class="d-flex align-items-center gap-2">' +
+                '<span class="fs-4">' + icon + '</span>' +
+                '<div>' +
+                  '<div class="fw-bold text-white fs-6">' + item.chemical + '</div>' +
+                '</div>' +
+              '</div>' +
+              '<span class="badge bg-dark border border-secondary text-info fw-bold">' + item.batches.toLocaleString() + ' รอบ</span>' +
+            '</div>' +
+
+            '<div class="chem-usage-main">' +
+              '<div class="small fw-semibold mb-1" style="color: #94a3b8;"><i class="bi bi-droplet-fill text-success me-1"></i>ใช้งานจริงรวม (Actual Used)</div>' +
+              '<div class="chem-usage-value text-success">' + item.actualTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' <small class="fs-6 fw-normal text-light">kg</small></div>' +
+              '<div class="small fw-semibold mt-1" style="color: #cbd5e1;">เป้าหมายรวม: <b style="color: #ff9800;">' + item.targetTotal.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kg</b></div>' +
+            '</div>' +
+
+            '<div class="mb-2">' +
+              '<div class="d-flex justify-content-between small text-light" style="font-size: 11px;">' +
+                '<span>อัตราส่วน (Actual/Target)</span>' +
+                '<span class="fw-bold text-info">' + ratio.toFixed(1) + '%</span>' +
+              '</div>' +
+              '<div class="progress bg-dark border border-secondary" style="height: 6px;">' +
+                '<div class="progress-bar" style="width: ' + Math.min(ratio, 100) + '%; background-color: ' + themeColor + ';"></div>' +
+              '</div>' +
+            '</div>' +
+
+            '<div class="d-flex justify-content-between align-items-center pt-2 border-top border-secondary small text-light" style="font-size: 11.5px;">' +
+              '<span>ผลต่าง: <b style="color: ' + diffColor + ';">' + diffSign + diff.toFixed(2) + ' kg</b></span>' +
+              '<span>เฉลี่ย: <b class="text-white">' + avg.toFixed(1) + ' kg/รอบ</b></span>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+      });
+
+      // 2. การ์ดสรุปยอดรวมทุกสารเคมี (Grand Total Card)
+      var grandDiff = grandActual - grandTarget;
+      var grandDiffSign = grandDiff > 0 ? '+' : '';
+      var grandDiffColor = Math.abs(grandDiff) <= 1.0 ? '#10b981' : (grandDiff > 0 ? '#ef4444' : '#38bdf8');
+      var grandAvg = grandBatches > 0 ? (grandActual / grandBatches) : 0;
+      var grandRatio = grandTarget > 0 ? (grandActual / grandTarget * 100) : 100;
+
+      html += '<div class="col">' +
+        '<div class="chem-usage-card chem-usage-card-total h-100">' +
+          '<div class="d-flex justify-content-between align-items-center mb-1">' +
+            '<div class="d-flex align-items-center gap-2">' +
+              '<span class="fs-4">📦</span>' +
+              '<div>' +
+                '<div class="fw-bold fs-6 text-warning">รวมทุกสารเคมี</div>' +
+              '</div>' +
+            '</div>' +
+            '<span class="badge bg-warning text-dark fw-bold">' + grandBatches.toLocaleString() + ' รอบรวม</span>' +
+          '</div>' +
+
+          '<div class="chem-usage-main">' +
+            '<div class="small fw-semibold mb-1" style="color: #94a3b8;"><i class="bi bi-boxes text-warning me-1"></i>ยอดใช้จริงรวมทั้งหมด</div>' +
+            '<div class="chem-usage-value text-warning">' + grandActual.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' <small class="fs-6 fw-normal text-light">kg</small></div>' +
+            '<div class="small fw-semibold mt-1" style="color: #cbd5e1;">เป้าหมายรวม: <b style="color: #ffffff;">' + grandTarget.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' kg</b></div>' +
+          '</div>' +
+
+          '<div class="mb-2">' +
+            '<div class="d-flex justify-content-between small text-light" style="font-size: 11px;">' +
+              '<span>อัตราความคืบหน้ารวม</span>' +
+              '<span class="fw-bold text-warning">' + grandRatio.toFixed(1) + '%</span>' +
+            '</div>' +
+            '<div class="progress bg-dark border border-secondary" style="height: 6px;">' +
+              '<div class="progress-bar bg-warning" style="width: ' + Math.min(grandRatio, 100) + '%;"></div>' +
+            '</div>' +
+          '</div>' +
+
+          '<div class="d-flex justify-content-between align-items-center pt-2 border-top border-secondary small text-light" style="font-size: 11.5px;">' +
+            '<span>ผลต่างรวม: <b style="color: ' + grandDiffColor + ';">' + grandDiffSign + grandDiff.toFixed(2) + ' kg</b></span>' +
+            '<span>เฉลี่ย/รอบ: <b class="text-white">' + grandAvg.toFixed(1) + ' kg</b></span>' +
+          '</div>' +
+        '</div>' +
+      '</div>';
+
+      container.innerHTML = html;
+    }
+
+    // กราฟแท่ง ปริมาณเคมีรวมแต่ละตัว
+    function renderBarChart(chemMap) {
+      var ctx = document.getElementById('barChart').getContext('2d');
+      var labels = [];
+      var actualData = [];
+      var targetData = [];
+
+      Object.keys(chemMap).sort().forEach(function(k) {
+        labels.push(chemMap[k].chemical);
+        actualData.push(chemMap[k].actualTotal);
+        targetData.push(chemMap[k].targetTotal);
+      });
+
+      if (barChartInstance) barChartInstance.destroy();
+
+      barChartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'ใช้จริงรวม (Actual: kg)',
+              data: actualData,
+              backgroundColor: '#00e676', // สีเขียวนีออนสดใส
+              borderRadius: 4
+            },
+            {
+              label: 'เป้าหมายรวม (Target: kg)',
+              data: targetData,
+              backgroundColor: '#ff9800', // สีส้มสดใส ตัดกับสีเขียวชัดเจน
+              borderRadius: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { 
+              labels: { 
+                color: '#f1f5f9',
+                font: { weight: 'bold' }
+              } 
+            }
+          },
+          scales: {
+            y: {
+              grid: { color: '#334155' },
+              ticks: { color: '#f1f5f9', font: { weight: '600' } },
+              title: { display: true, text: 'กิโลกรัม (kg)', color: '#93c5fd', font: { weight: 'bold' } }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#f1f5f9', font: { weight: '600' } }
+            }
+          }
+        }
+      });
+    }
+
+    // กราฟเส้น SCADA Process Trend
+    function renderTrendChart(rows) {
+      var ctx = document.getElementById('trendChart').getContext('2d');
+      // แสดงตัวอย่าง 40 รายการล่าสุด
+      var sample = rows.slice(-40);
+      var labels = [];
+      var targetData = [];
+      var actualData = [];
+
+      sample.forEach(function(r) {
+        var d = parseDateSafe(r[0]);
+        labels.push(d ? formatTime(d) : String(r[0] || ''));
+        targetData.push(parseCleanNum(r[1]) || 0);
+        actualData.push((!isNaN(parseCleanNum(r[3]))) ? parseCleanNum(r[3]) : (parseCleanNum(r[2]) || 0));
+      });
+
+      if (trendChartInstance) trendChartInstance.destroy();
+
+      trendChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'TARGET (SV: kg - เป้าหมาย)',
+              data: targetData,
+              borderColor: '#ff9800', // สีส้มแสดสดใส ตัดกับสีเขียว 100%
+              backgroundColor: 'rgba(255, 152, 0, 0.05)',
+              borderWidth: 2.5,
+              borderDash: [6, 4], // เส้นประ
+              pointRadius: 4,
+              pointBackgroundColor: '#ff9800',
+              pointBorderColor: '#ffffff',
+              pointBorderWidth: 1,
+              fill: false
+            },
+            {
+              label: 'ACTUAL (PV: kg - ใช้จริง)',
+              data: actualData,
+              borderColor: '#00e676', // สีเขียวนีออนสว่างสดใส
+              backgroundColor: 'rgba(0, 230, 118, 0.12)',
+              borderWidth: 2.5, // เส้นทึบ
+              pointRadius: 4,
+              pointBackgroundColor: '#00e676',
+              pointBorderColor: '#ffffff',
+              pointBorderWidth: 1,
+              fill: true,
+              tension: 0.2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { 
+              labels: { 
+                color: '#ffffff',
+                font: { weight: 'bold', size: 13 }
+              } 
+            }
+          },
+          scales: {
+            y: {
+              grid: { color: '#334155' },
+              ticks: { color: '#f1f5f9', font: { weight: '600' } },
+              title: { display: true, text: 'น้ำหนัก (kg)', color: '#93c5fd', font: { weight: 'bold' } }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#f1f5f9', font: { weight: '600' } }
+            }
+          }
+        }
+      });
+    }
+
+    // ตัวแปรสำหรับ Pagination
+    let currentDetailRows = [];
+    let currentPage = 1;
+    const PAGE_SIZE = 20;
+
+    // ตารางประวัติบันทึกการชั่ง
+    function renderDetailTable(rows) {
+      currentDetailRows = rows.slice().reverse(); // เอาล่าสุดขึ้นก่อน
+      currentPage = 1; // รีเซ็ตมาหน้า 1 ทุกครั้งที่กรองใหม่
+      displayCurrentPage();
+    }
+
+    function displayCurrentPage() {
+      var tbody = document.querySelector('#detail-table tbody');
+      var totalRecords = currentDetailRows.length;
+      document.getElementById('detail-count').innerText = totalRecords.toLocaleString();
+
+      var paginationWrapper = document.getElementById('pagination-wrapper');
+
+      if (totalRecords === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">ไม่พบข้อมูลตามช่วงเวลาที่เลือก</td></tr>';
+        if (paginationWrapper) paginationWrapper.style.setProperty('display', 'none', 'important');
+        return;
+      }
+
+      var totalPages = Math.ceil(totalRecords / PAGE_SIZE);
+      if (currentPage > totalPages) currentPage = totalPages;
+      if (currentPage < 1) currentPage = 1;
+
+      var startIndex = (currentPage - 1) * PAGE_SIZE;
+      var endIndex = Math.min(startIndex + PAGE_SIZE, totalRecords);
+      var pageRows = currentDetailRows.slice(startIndex, endIndex);
+
+      var html = '';
+      pageRows.forEach(function(r, index) {
+        var rowNum = startIndex + index + 1;
+        var dateObj = parseDateSafe(r[0]);
+        var dateStr = dateObj ? formatDateTime(dateObj) : (r[0] || '-');
+        var scaleInfo = parseScaleInfo(r[4]);
+
+        var target = parseCleanNum(r[1]);
+        var actual = (!isNaN(parseCleanNum(r[3]))) ? parseCleanNum(r[3]) : parseCleanNum(r[2]);
+        var diffHtml = '<span class="text-muted">-</span>';
+        var statusBadge = '<span class="badge bg-secondary">ไม่ระบุ</span>';
+
+        if (!isNaN(target) && !isNaN(actual)) {
+          var diff = actual - target;
+          var sign = diff > 0 ? '+' : '';
+          var diffPct = target > 0 ? (Math.abs(diff) / target) * 100 : 0;
+          var isNormal = target > 0 ? (diffPct <= currentTolerancePercent) : (Math.abs(diff) <= 0.5);
+          var diffColor = isNormal ? '#10b981' : (diff > 0 ? '#ef4444' : '#38bdf8');
+          var pctStr = target > 0 ? ' <small style="font-size:11px; opacity:0.85;">(' + (diff > 0 ? '+' : '') + diffPct.toFixed(1) + '%)</small>' : '';
+          diffHtml = '<span style="color:' + diffColor + '; font-weight:bold;">' + sign + diff.toFixed(2) + pctStr + '</span>';
+
+          if (isNormal) {
+            statusBadge = '<span class="badge bg-success-subtle text-success border border-success" title="อยู่ในเกณฑ์ ±' + currentTolerancePercent.toFixed(1) + '%">อยู่ในเกณฑ์ยอมรับ</span>';
+          } else {
+            statusBadge = '<span class="badge bg-danger-subtle text-danger border border-danger" title="เกินเกณฑ์ ±' + currentTolerancePercent.toFixed(1) + '%">เกินเกณฑ์ที่ยอมรับ</span>';
+          }
+        }
+
+        var modeBadgeClass = scaleInfo.mode === 'Mode Weight' ? 'bg-success text-white' : 'bg-primary text-white';
+        var actualDisplay = (r[3] !== undefined && r[3] !== "") ? r[3] : (r[2] !== undefined && r[2] !== "" ? r[2] : '-');
+
+        html += '<tr>';
+        html += '<td class="col-idx">' + rowNum + '</td>';
+        html += '<td style="color: #38bdf8 !important; font-weight: 600;">' + dateStr + '</td>';
+        html += '<td class="text-start ps-3 fw-bold text-white">🧪 ' + scaleInfo.chemical + '</td>';
+        html += '<td><span class="badge ' + modeBadgeClass + ' small px-2 py-1">' + scaleInfo.mode + '</span></td>';
+        html += '<td class="text-num fw-bold" style="color: #ff9800 !important;">' + (r[1] !== undefined && r[1] !== "" ? r[1] : '-') + '</td>';
+        html += '<td class="text-num fw-bold" style="color: #00e676 !important;">' + actualDisplay + '</td>';
+        html += '<td class="text-num fw-bold">' + diffHtml + '</td>';
+        html += '<td>' + statusBadge + '</td>';
+        html += '</tr>';
+      });
+
+      tbody.innerHTML = html;
+
+      // จัดการตัวเลื่อนหน้า Pagination
+      if (totalRecords > PAGE_SIZE) {
+        paginationWrapper.style.setProperty('display', 'flex', 'important');
+        document.getElementById('pagination-info').innerText = 
+          'แสดงรายการที่ ' + (startIndex + 1).toLocaleString() + ' ถึง ' + endIndex.toLocaleString() + ' จากทั้งหมด ' + totalRecords.toLocaleString() + ' รายการ (หน้า ' + currentPage + ' จาก ' + totalPages + ')';
+        renderPaginationButtons(totalPages, currentPage);
+      } else {
+        paginationWrapper.style.setProperty('display', 'none', 'important');
+      }
+    }
+
+    // ฟังก์ชันสร้างปุ่มเลื่อนหน้า << หน้า >>
+    function renderPaginationButtons(totalPages, page) {
+      var container = document.getElementById('pagination-buttons');
+      var html = '';
+
+      var disabledFirst = (page === 1) ? 'disabled' : '';
+      var disabledLast = (page === totalPages) ? 'disabled' : '';
+
+      html += '<button class="btn btn-sm btn-outline-light px-2 fw-semibold text-white" ' + disabledFirst + ' onclick="goToPage(1)" title="หน้าแรกสุด">&laquo;&laquo; หน้าแรก</button>';
+      html += '<button class="btn btn-sm btn-outline-light px-2 fw-semibold text-white" ' + disabledFirst + ' onclick="goToPage(' + (page - 1) + ')" title="หน้าก่อนหน้า">&laquo; ก่อนหน้า</button>';
+
+      // ปุ่มตัวเลขหน้า
+      var startP = Math.max(1, page - 2);
+      var endP = Math.min(totalPages, page + 2);
+
+      if (startP > 1) {
+        html += '<button class="btn btn-sm btn-outline-light px-2 fw-semibold text-white" onclick="goToPage(1)">1</button>';
+        if (startP > 2) html += '<span class="text-white px-2 fw-bold">...</span>';
+      }
+
+      for (var p = startP; p <= endP; p++) {
+        var activeClass = (p === page) ? 'btn-primary text-white fw-bold shadow-sm' : 'btn-outline-light text-white fw-semibold';
+        html += '<button class="btn btn-sm ' + activeClass + ' px-2" onclick="goToPage(' + p + ')">' + p + '</button>';
+      }
+
+      if (endP < totalPages) {
+        if (endP < totalPages - 1) html += '<span class="text-white px-2 fw-bold">...</span>';
+        html += '<button class="btn btn-sm btn-outline-light px-2 fw-semibold text-white" onclick="goToPage(' + totalPages + ')">' + totalPages + '</button>';
+      }
+
+      html += '<button class="btn btn-sm btn-outline-light px-2 fw-semibold text-white" ' + disabledLast + ' onclick="goToPage(' + (page + 1) + ')" title="หน้าถัดไป">ถัดไป &raquo;</button>';
+      html += '<button class="btn btn-sm btn-outline-light px-2 fw-semibold text-white" ' + disabledLast + ' onclick="goToPage(' + totalPages + ')" title="หน้าสุดท้าย">หน้าสุดท้าย &raquo;&raquo;</button>';
+
+      container.innerHTML = html;
+    }
+
+    function goToPage(p) {
+      currentPage = p;
+      displayCurrentPage();
+      var tableEl = document.getElementById('detail-table');
+      if (tableEl) tableEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+
+    function setQuickDate(type) {
+      var now = new Date();
+      var start = new Date();
+      var end = new Date();
+
+      if (type === 'today') {
+      } else if (type === 'yesterday') {
+        start.setDate(now.getDate() - 1);
+        end.setDate(now.getDate() - 1);
+      } else if (type === '7days') {
+        start.setDate(now.getDate() - 7);
+      } else if (type === '30days') {
+        start.setDate(now.getDate() - 30);
+      } else if (type === 'all') {
+        document.getElementById('start-date').value = '';
+        document.getElementById('end-date').value = '';
+        filterData();
+        return;
+      }
+
+      document.getElementById('start-date').value = toISODate(start);
+      document.getElementById('end-date').value = toISODate(end);
+      filterData();
+    }
+
+    function clearFilter() {
+      document.getElementById('chemical-filter').value = 'ALL';
+      document.getElementById('mode-filter').value = 'ALL';
+      setQuickDate('all');
+    }
+
+    function toISODate(d) {
+      var pad = function(n) { return n < 10 ? '0' + n : n; };
+      return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+    }
+
+    // ฟังก์ชันแปลงตัวเลขอย่างปลอดภัย (ตัดเครื่องหมาย ' หรือ , ที่ Google Sheets มักใส่มา)
+    function parseCleanNum(val) {
+      if (val === undefined || val === null || val === '') return NaN;
+      var s = String(val).replace(/^['"\s]+/, '').replace(/,/g, '').trim();
+      var n = parseFloat(s);
+      return isNaN(n) ? NaN : n;
+    }
+
+    function parseDateSafe(val) {
+      if (!val) return null;
+      if (val instanceof Date) return isNaN(val.getTime()) ? null : val;
+      var cleanVal = String(val).trim().replace(/\s*\(.*?\)/, '');
+      
+      // 1. ตรวจสอบรูปแบบ DD/MM/YYYY หรือ D/M/YYYY (แบบไทย/สากล) ก่อน เพื่อไม่ให้เบราว์เซอร์สลับวันกับเดือนเป็นแบบ US
+      var dmyMatch = cleanVal.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})(?:[,\s]+(\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?/);
+      if (dmyMatch) {
+        var day = parseInt(dmyMatch[1], 10);
+        var month = parseInt(dmyMatch[2], 10) - 1;
+        var year = parseInt(dmyMatch[3], 10);
+        var hour = parseInt(dmyMatch[4] || 0, 10);
+        var min = parseInt(dmyMatch[5] || 0, 10);
+        var sec = parseInt(dmyMatch[6] || 0, 10);
+        var parsed = new Date(year, month, day, hour, min, sec);
+        if (!isNaN(parsed.getTime())) return parsed;
+      }
+
+      // 2. ถ้าเป็นรูปแบบมาตรฐาน ISO เช่น 2026-11-09T03:18:25.000Z
+      var d = new Date(cleanVal);
+      if (d instanceof Date && !isNaN(d.getTime())) return d;
+      
+      var dOrig = new Date(val);
+      return (dOrig instanceof Date && !isNaN(dOrig.getTime())) ? dOrig : null;
+    }
+
+    function formatTime(d) {
+      var pad = function(n) { return n < 10 ? '0' + n : n; };
+      return pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    }
+
+    function formatDateTime(d) {
+      var pad = function(n) { return n < 10 ? '0' + n : n; };
+      return pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds());
+    }
+
+    // ฟังก์ชันส่งออกข้อมูลเป็นไฟล์ Excel (.xlsx)
+    function exportToExcel() {
+      // ตรวจสอบว่าขณะนี้เปิดแท็บใดอยู่
+      var isTankActive = document.getElementById('tab-tanks-btn') && document.getElementById('tab-tanks-btn').classList.contains('active');
+      if (isTankActive) {
+        exportTankToExcel();
+        return;
+      }
+
+      if (!currentDetailRows || currentDetailRows.length === 0) {
+        alert('ไม่มีข้อมูลสำหรับส่งออก Excel');
+        return;
+      }
+
+      if (typeof XLSX === 'undefined') {
+        alert('ระบบกำลังโหลดไลบรารี Excel กรุณาลองใหม่อีกครั้งใน 2-3 วินาที');
+        return;
+      }
+
+      // สร้าง Workbook
+      var wb = XLSX.utils.book_new();
+
+      // 1. แผ่นงานที่ 1: สรุปปริมาณการใช้งานเคมี
+      var summaryData = [
+        ['รายงานสรุปยอดการใช้งานเคมี (PP CHEMICAL DOSING SYSTEM)'],
+        ['เงื่อนไข: ' + document.getElementById('filter-status').innerText],
+        ['เกณฑ์ผลต่างยอมรับได้: ±' + currentTolerancePercent.toFixed(1) + '%'],
+        ['วันที่ออกรายงาน: ' + new Date().toLocaleString('th-TH')],
+        [],
+        ['ลำดับ', 'ชื่อสารเคมี', 'จำนวนรอบ (ครั้ง)', 'เป้าหมายรวม (kg)', 'ใช้งานจริงรวม (kg)', 'ผลต่าง (kg)', 'เฉลี่ยต่อรอบ (kg/ครั้ง)']
+      ];
+
+      var summaryRows = document.querySelectorAll('#summary-table tbody tr');
+      var sIdx = 1;
+      summaryRows.forEach(function(tr) {
+        var cells = tr.querySelectorAll('td');
+        if (cells.length >= 7 && !cells[0].getAttribute('colspan')) {
+          summaryData.push([
+            sIdx++,
+            cells[1].innerText.replace('🧪', '').trim(),
+            parseFloat(cells[2].innerText.replace(/,/g, '')) || 0,
+            parseFloat(cells[3].innerText.replace(/,/g, '')) || 0,
+            parseFloat(cells[4].innerText.replace(/,/g, '')) || 0,
+            parseFloat(cells[5].innerText.replace(/,/g, '')) || 0,
+            parseFloat(cells[6].innerText.replace(/,/g, '')) || 0
+          ]);
+        }
+      });
+
+      var wsSummary = XLSX.utils.aoa_to_sheet(summaryData);
+      wsSummary['!cols'] = [
+        { wch: 8 }, { wch: 26 }, { wch: 18 }, { wch: 20 }, { wch: 20 }, { wch: 16 }, { wch: 20 }
+      ];
+      XLSX.utils.book_append_sheet(wb, wsSummary, 'สรุปยอดการใช้เคมี');
+
+      // 2. แผ่นงานที่ 2: รายการบันทึกการชั่งละเอียดทั้งหมด (ตามช่วงเวลาและเงื่อนไขที่กรอง)
+      var detailData = [
+        ['ลำดับ', 'วัน-เวลา (Timestamp)', 'ชื่อสารเคมี (Chemical)', 'โหมด (Mode)', 'Target (kg)', 'Actual (kg)', 'ผลต่าง (Diff)', 'สถานะ']
+      ];
+
+      currentDetailRows.forEach(function(r, index) {
+        var dateObj = parseDateSafe(r[0]);
+        var dateStr = dateObj ? formatDateTime(dateObj) : (r[0] || '-');
+        var scaleInfo = parseScaleInfo(r[4]);
+
+        var target = parseCleanNum(r[1]);
+        var actual = (!isNaN(parseCleanNum(r[3]))) ? parseCleanNum(r[3]) : (!isNaN(parseCleanNum(r[2])) ? parseCleanNum(r[2]) : NaN);
+        var diffVal = (!isNaN(target) && !isNaN(actual)) ? (actual - target) : '';
+        var diffPct = (target > 0 && diffVal !== '') ? (Math.abs(diffVal) / target * 100) : 0;
+        var isNormal = target > 0 ? (diffPct <= currentTolerancePercent) : (Math.abs(diffVal) <= 0.5);
+
+        detailData.push([
+          index + 1,
+          dateStr,
+          scaleInfo.chemical,
+          scaleInfo.mode,
+          !isNaN(target) ? target : (r[1] || ''),
+          !isNaN(actual) ? actual : (r[3] || r[2] || ''),
+          diffVal !== '' ? (Number(diffVal.toFixed(2)) + (target > 0 ? ' (' + (diffVal > 0 ? '+' : '') + diffPct.toFixed(1) + '%)' : '')) : '',
+          diffVal !== '' ? (isNormal ? 'อยู่ในเกณฑ์ยอมรับ' : 'เกินเกณฑ์ที่ยอมรับ') : 'ไม่ระบุ'
+        ]);
+      });
+
+      var wsDetail = XLSX.utils.aoa_to_sheet(detailData);
+      wsDetail['!cols'] = [
+        { wch: 8 }, { wch: 22 }, { wch: 24 }, { wch: 15 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 20 }
+      ];
+      XLSX.utils.book_append_sheet(wb, wsDetail, 'ประวัติการชั่งละเอียด');
+
+      // ตั้งชื่อไฟล์ตามวันที่ที่เลือก
+      var startStr = document.getElementById('start-date').value || 'All';
+      var endStr = document.getElementById('end-date').value || 'All';
+      var fileName = 'PP_Chemical_Report_' + startStr + '_to_' + endStr + '.xlsx';
+
+      // ดาวน์โหลดไฟล์ Excel ทันที
+      XLSX.writeFile(wb, fileName);
+    }
+
+    // ========================================================
+    // ฟังก์ชันระบบ InfluxDB และภาพจำลองแท็งก์สารเคมี (Tank Farm)
+    // ========================================================
+
+    // สลับโหลดข้อมูลตามแท็บที่กำลังเปิดอยู่
+    function refreshCurrentTab() {
+      var isTankActive = document.getElementById('tab-tanks-btn') && document.getElementById('tab-tanks-btn').classList.contains('active');
+      if (isTankActive) {
+        loadTankData(false);
+        filterTankHistory();
+      } else {
+        loadData(false);
+      }
+    }
+
+    // ทำงานเมื่อผู้ใช้คลิกสลับมายังแท็บ "ปริมาณสารเคมีในแท็งก์"
+    function onTankTabActivated() {
+      if (!isTankDataLoaded) {
+        loadTankData(false);
+        filterTankHistory();
+      } else {
+        // อัปเดตกราฟเมื่อเปิดแท็บ
+        setTimeout(function() {
+          if (tankTrendChartInstance) tankTrendChartInstance.resize();
+        }, 120);
+      }
+    }
+
+    // ฟังก์ชันส่งคำสั่ง Flux Query ไปยัง InfluxDB v2 Cloud
+    async function queryInflux(fluxQuery) {
+      var endpoint = INFLUX_CONFIG.url + '/api/v2/query?org=' + encodeURIComponent(INFLUX_CONFIG.org);
+      var res = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Token ' + INFLUX_CONFIG.token,
+          'Content-Type': 'application/json',
+          'Accept': 'application/csv'
+        },
+        body: JSON.stringify({ query: fluxQuery, type: 'flux' })
+      });
+      if (!res.ok) {
+        throw new Error('InfluxDB HTTP ' + res.status + ' (' + res.statusText + ')');
+      }
+      return await res.text();
+    }
+
+    // โหลดข้อมูลค่าล่าสุด (Last values) ของระดับและอุณหภูมิแท็งก์
+    async function loadTankData(isSilent) {
+      var commEl = document.getElementById('tank-comm-status');
+      if (!isSilent && commEl) {
+        commEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> กำลังดึงข้อมูล InfluxDB...';
+        commEl.className = 'badge bg-dark border border-secondary px-3 py-2 text-warning fw-semibold';
+      }
+
+      var flux = 'from(bucket: "' + INFLUX_CONFIG.bucket + '")\n' +
+                 '  |> range(start: -24h)\n' +
+                 '  |> filter(fn: (r) => r._measurement == "' + INFLUX_CONFIG.measurement + '")\n' +
+                 '  |> last()';
+
+      try {
+        var csv = await queryInflux(flux);
+        var tanks = parseLastTanksCsv(csv);
+        latestTankData = tanks;
+        isTankDataLoaded = true;
+
+        renderTankUI(tanks);
+
+        if (commEl) {
+          commEl.innerHTML = '<span class="status-led"></span> เชื่อมต่อ InfluxDB สำเร็จ';
+          commEl.className = 'badge bg-dark border border-secondary px-3 py-2 text-success fw-semibold';
+        }
+        var timeEl = document.getElementById('tank-last-update-time');
+        if (timeEl) {
+          timeEl.innerHTML = '<i class="bi bi-clock me-1"></i> อัปเดต: ' + new Date().toLocaleTimeString('th-TH');
+        }
+      } catch (err) {
+        console.error('InfluxDB Query Error:', err);
+        if (commEl) {
+          commEl.innerHTML = '<i class="bi bi-exclamation-triangle text-danger me-1"></i> ซิงค์ไม่สำเร็จ: ' + (err.message || err);
+          commEl.className = 'badge bg-dark border border-danger px-3 py-2 text-danger fw-semibold';
+        }
+      }
+    }
+
+    // แยกวิเคราะห์ CSV ผลลัพธ์จาก InfluxDB สำหรับค่าล่าสุดของแต่ละแท็งก์
+    function parseLastTanksCsv(csvText) {
+      var result = {
+        'NaOH50': { volume: 0, temp: 0, time: null },
+        'LS9': { volume: 0, temp: 0, time: null },
+        'UD1': { volume: 0, temp: 0, time: null },
+        'LAS': { volume: 0, temp: 0, time: null },
+        'DI': { volume: 0, temp: 0, time: null }
+      };
+
+      var lines = csvText.trim().split('\n');
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line || line.startsWith('#')) continue;
+        var parts = line.split(',');
+        if (parts.length >= 8) {
+          var val = parseFloat(parts[6]);
+          var field = parts[7] ? parts[7].trim() : '';
+          var time = parts[5];
+          if (isNaN(val)) continue;
+
+          var fLower = field.toLowerCase();
+          var key = null;
+          if (fLower.startsWith('naoh50')) key = 'NaOH50';
+          else if (fLower.startsWith('ls9')) key = 'LS9';
+          else if (fLower.startsWith('ud1')) key = 'UD1';
+          else if (fLower.startsWith('las')) key = 'LAS';
+          else if (fLower.startsWith('di')) key = 'DI';
+
+          if (key) {
+            if (fLower.endsWith('volume')) {
+              result[key].volume = val;
+              result[key].time = time;
+            } else if (fLower.endsWith('temp')) {
+              result[key].temp = val;
+            }
+          }
+        }
+      }
+      return result;
+    }
+
+    // แสดงผลภาพจำลองแท็งก์ (SCADA Tank Mimic Cards), การ์ด KPI, และตารางรายละเอียด
+    function renderTankUI(tanks) {
+      var totalVol = 0;
+      var totalCap = 0;
+      var temps = [];
+      var lowCount = 0;
+
+      var cardsHtml = '';
+      var tableHtml = '';
+      var idx = 1;
+
+      for (var k in TANK_SPECS) {
+        var spec = TANK_SPECS[k];
+        var item = tanks[k] || { volume: 0, temp: 0, time: null };
+        var vol = item.volume || 0;
+        var temp = item.temp || 0;
+        var maxCap = spec.maxCapacity || 20000;
+        var pct = maxCap > 0 ? (vol / maxCap * 100) : 0;
+        if (pct > 100) pct = 100;
+        var ullage = Math.max(0, maxCap - vol);
+
+        totalVol += vol;
+        totalCap += maxCap;
+        if (temp > 0) temps.push(temp);
+
+        // คำนวณสถานะเตือนระดับสารเคมี
+        var statusBadge = '';
+        if (pct < 15) {
+          lowCount++;
+          statusBadge = '<span class="badge bg-danger text-white border border-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i>ระดับต่ำ (เติมด่วน)</span>';
+        } else if (pct < 30) {
+          statusBadge = '<span class="badge bg-warning text-dark border border-warning"><i class="bi bi-info-circle me-1"></i>ระดับปานกลาง</span>';
+        } else {
+          statusBadge = '<span class="badge bg-success-subtle text-success border border-success"><i class="bi bi-check-circle me-1"></i>ระดับปกติ</span>';
+        }
+
+        var timeStr = item.time ? new Date(item.time).toLocaleTimeString('th-TH') : '-';
+        var fullTimeStr = item.time ? new Date(item.time).toLocaleString('th-TH') : '-';
+
+        // 1. SCADA Tank Card HTML
+        cardsHtml += '<div class="col">' +
+          '<div class="tank-card">' +
+            '<div class="tank-card-header">' +
+              '<div>' +
+                '<div class="d-flex align-items-center gap-1">' +
+                  '<span class="fs-5">' + spec.icon + '</span>' +
+                  '<span class="fw-bold fs-6 text-white">' + spec.shortName + '</span>' +
+                '</div>' +
+                '<div class="small fw-semibold" style="font-size: 11px; color: #ff9800;">' + spec.name + '</div>' +
+              '</div>' +
+              statusBadge +
+            '</div>' +
+            '<div class="tank-graphic-wrapper">' +
+              '<div class="tank-cylinder">' +
+                '<div class="tank-liquid" style="height: ' + pct.toFixed(1) + '%; background: ' + spec.colorGrad + ';">' +
+                  '<div class="tank-liquid-wave"></div>' +
+                '</div>' +
+                '<div class="tank-pct-bubble" style="border-color: ' + spec.color + ';">' +
+                  pct.toFixed(1) + '%' +
+                '</div>' +
+              '</div>' +
+              '<div class="tank-ruler">' +
+                '<div class="tank-ruler-mark"><span class="tank-ruler-line"></span>100%</div>' +
+                '<div class="tank-ruler-mark"><span class="tank-ruler-line"></span>75%</div>' +
+                '<div class="tank-ruler-mark"><span class="tank-ruler-line"></span>50%</div>' +
+                '<div class="tank-ruler-mark"><span class="tank-ruler-line"></span>25%</div>' +
+                '<div class="tank-ruler-mark"><span class="tank-ruler-line"></span>0%</div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="tank-readout-grid">' +
+              '<div class="tank-readout-item">' +
+                '<div class="tank-readout-label"><i class="bi bi-droplet me-1"></i>ปริมาณคงเหลือ</div>' +
+                '<div class="tank-readout-val text-info">' + Number(vol.toFixed(1)).toLocaleString() + ' <span class="small fw-normal text-light">L</span></div>' +
+              '</div>' +
+              '<div class="tank-readout-item">' +
+                '<div class="tank-readout-label"><i class="bi bi-box-seam me-1"></i>ความจุเต็มถัง</div>' +
+                '<div class="tank-readout-val text-light">' + Number(maxCap).toLocaleString() + ' <span class="small fw-normal text-light">L</span></div>' +
+              '</div>' +
+              '<div class="tank-readout-item">' +
+                '<div class="tank-readout-label"><i class="bi bi-thermometer-half me-1"></i>อุณหภูมิ</div>' +
+                '<div class="tank-readout-val text-warning">' + (temp > 0 ? Number(temp.toFixed(1)) : '-') + ' <span class="small fw-normal text-light">°C</span></div>' +
+              '</div>' +
+              '<div class="tank-readout-item">' +
+                '<div class="tank-readout-label"><i class="bi bi-arrows-expand me-1"></i>พื้นที่ว่าง (Ullage)</div>' +
+                '<div class="tank-readout-val text-success">' + Number(ullage.toFixed(1)).toLocaleString() + ' <span class="small fw-normal text-light">L</span></div>' +
+              '</div>' +
+            '</div>' +
+            '<div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top border-secondary small text-light" style="font-size: 11px;">' +
+              '<span><i class="bi bi-clock me-1"></i>ตรวจวัดล่าสุด:</span>' +
+              '<span class="fw-semibold text-info">' + timeStr + '</span>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+
+        // 2. Table Row HTML
+        tableHtml += '<tr>' +
+          '<td class="col-idx">' + (idx++) + '</td>' +
+          '<td class="text-start ps-3">' +
+            '<span class="me-1">' + spec.icon + '</span>' +
+            '<b class="text-white">' + spec.name + '</b>' +
+            '<span class="badge bg-dark border border-secondary text-info ms-2">' + spec.shortName + '</span>' +
+          '</td>' +
+          '<td class="text-num fw-bold text-info fs-6">' + Number(vol.toFixed(2)).toLocaleString() + '</td>' +
+          '<td class="text-num text-light">' + Number(maxCap).toLocaleString() + '</td>' +
+          '<td class="text-center">' +
+            '<div class="d-flex align-items-center justify-content-center gap-2">' +
+              '<div class="progress flex-grow-1 bg-dark border border-secondary" style="height: 8px; max-width: 80px;">' +
+                '<div class="progress-bar" role="progressbar" style="width: ' + pct.toFixed(0) + '%; background-color: ' + spec.color + ';" aria-valuenow="' + pct.toFixed(0) + '" aria-valuemin="0" aria-valuemax="100"></div>' +
+              '</div>' +
+              '<span class="fw-bold" style="color: ' + spec.color + '; width: 50px; text-align: right;">' + pct.toFixed(1) + '%</span>' +
+            '</div>' +
+          '</td>' +
+          '<td class="text-num text-success">' + Number(ullage.toFixed(2)).toLocaleString() + '</td>' +
+          '<td class="text-center text-warning fw-semibold">' + (temp > 0 ? Number(temp.toFixed(1)) + ' °C' : '-') + '</td>' +
+          '<td class="text-center small text-light">' + fullTimeStr + '</td>' +
+          '<td class="text-center">' + statusBadge + '</td>' +
+        '</tr>';
+      }
+
+      // นำ HTML ใส่ Container
+      var rowEl = document.getElementById('tank-cards-row');
+      if (rowEl) rowEl.innerHTML = cardsHtml;
+
+      var tbodyEl = document.querySelector('#tank-inventory-table tbody');
+      if (tbodyEl) tbodyEl.innerHTML = tableHtml;
+
+      // อัปเดตข้อมูลการ์ดภาพรวม (Overview KPI)
+      var totalPct = totalCap > 0 ? (totalVol / totalCap * 100) : 0;
+      var totalVolEl = document.getElementById('farm-total-volume');
+      if (totalVolEl) totalVolEl.innerText = Number(totalVol.toFixed(1)).toLocaleString();
+
+      var totalPctEl = document.getElementById('farm-total-pct');
+      if (totalPctEl) totalPctEl.innerText = 'คิดเป็น ' + totalPct.toFixed(1) + '% จากความจุรวม ' + Number(totalCap).toLocaleString() + ' L';
+
+      var avgTemp = temps.length > 0 ? (temps.reduce(function(a, b) { return a + b; }, 0) / temps.length) : 0;
+      var avgTempEl = document.getElementById('farm-avg-temp');
+      if (avgTempEl) avgTempEl.innerText = avgTemp > 0 ? avgTemp.toFixed(1) : '--';
+
+      var tempRangeEl = document.getElementById('farm-temp-range');
+      if (tempRangeEl && temps.length > 0) {
+        var minTemp = Math.min.apply(null, temps);
+        var maxTemp = Math.max.apply(null, temps);
+        tempRangeEl.innerText = 'ช่วงอุณหภูมิ: ' + minTemp.toFixed(1) + ' - ' + maxTemp.toFixed(1) + ' °C';
+      }
+
+      var stockStatusEl = document.getElementById('farm-stock-status');
+      var stockHintEl = document.getElementById('farm-stock-hint');
+      if (stockStatusEl && stockHintEl) {
+        if (lowCount > 0) {
+          stockStatusEl.className = 'fs-5 fw-bold text-danger';
+          stockStatusEl.innerText = '⚠️ มีแท็งก์ระดับต่ำ ' + lowCount + ' แท็งก์';
+          stockHintEl.innerText = 'กรุณาตรวจสอบและเตรียมเติมสารเคมีเข้าแท็งก์';
+        } else {
+          stockStatusEl.className = 'fs-5 fw-bold text-success';
+          stockStatusEl.innerText = 'อยู่ในเกณฑ์ปกติทุกแท็งก์';
+          stockHintEl.innerText = 'ไม่มีแท็งก์ที่ระดับต่ำวิกฤต (พร้อมแบ่งจ่าย)';
+        }
+      }
+    }
+
+    // ========================================================
+    // ฟังก์ชันระบบประวัติการเติมสารเคมี และสต็อกย้อนหลัง (Refill & Stock History)
+    // ========================================================
+
+    // กำหนดค่าเริ่มต้นของตัวกรองประวัติแท็งก์เป็น 7 วันล่าสุด
+    function initTankHistoryDates() {
+      var now = new Date();
+      var start = new Date(Date.now() - 7 * 24 * 3600 * 1000);
+      var pad = function(n) { return n < 10 ? '0' + n : n; };
+      var formatInput = function(d) {
+        return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+      };
+      var startEl = document.getElementById('tank-start-date');
+      var endEl = document.getElementById('tank-end-date');
+      if (startEl && !startEl.value) startEl.value = formatInput(start);
+      if (endEl && !endEl.value) endEl.value = formatInput(now);
+    }
+
+    // ปุ่มลัดเลือกช่วงเวลาประวัติแท็งก์
+    function setTankQuickDate(type) {
+      var now = new Date();
+      var start = new Date();
+      var end = new Date();
+
+      if (type === 'today') {
+        start.setHours(0, 0, 0, 0);
+      } else if (type === 'yesterday') {
+        start.setDate(now.getDate() - 1);
+        start.setHours(0, 0, 0, 0);
+        end.setDate(now.getDate() - 1);
+        end.setHours(23, 59, 59, 999);
+      } else if (type === '7days') {
+        start.setDate(now.getDate() - 7);
+        start.setHours(0, 0, 0, 0);
+      } else if (type === '15days') {
+        start.setDate(now.getDate() - 15);
+        start.setHours(0, 0, 0, 0);
+      } else if (type === '30days') {
+        start.setDate(now.getDate() - 30);
+        start.setHours(0, 0, 0, 0);
+      }
+
+      var pad = function(n) { return n < 10 ? '0' + n : n; };
+      var formatInput = function(d) {
+        return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate());
+      };
+
+      var startEl = document.getElementById('tank-start-date');
+      var endEl = document.getElementById('tank-end-date');
+      if (startEl) startEl.value = formatInput(start);
+      if (endEl) endEl.value = formatInput(end);
+
+      filterTankHistory();
+    }
+
+    function clearTankHistoryFilter() {
+      var chemSel = document.getElementById('tank-chem-filter');
+      if (chemSel) chemSel.value = 'ALL';
+      setTankQuickDate('7days');
+    }
+
+    // ฟังก์ชันดึงประวัติสต็อกย้อนหลัง และตรวจจับเหตุการณ์การเติมสารเคมี (Refill Detection)
+    async function filterTankHistory() {
+      var startVal = document.getElementById('tank-start-date') ? document.getElementById('tank-start-date').value : '';
+      var endVal = document.getElementById('tank-end-date') ? document.getElementById('tank-end-date').value : '';
+      var selectedChem = document.getElementById('tank-chem-filter') ? document.getElementById('tank-chem-filter').value : 'ALL';
+
+      var startDate = startVal ? new Date(startVal + 'T00:00:00') : new Date(Date.now() - 7 * 24 * 3600 * 1000);
+      var endDate = endVal ? new Date(endVal + 'T23:59:59') : new Date();
+
+      var daySpan = Math.max(1, (endDate - startDate) / (1000 * 3600 * 24));
+      var aggWindow = '10m';
+      if (daySpan <= 2) aggWindow = '5m';
+      else if (daySpan <= 7) aggWindow = '10m';
+      else aggWindow = '15m';
+
+      var periodText = (startVal && endVal) ? (startVal + ' ถึง ' + endVal) : '7 วันล่าสุด';
+      var periodBadge = document.getElementById('tank-trend-period-badge');
+      if (periodBadge) periodBadge.innerHTML = '<i class="bi bi-calendar3 me-1"></i>ช่วงเวลา: ' + periodText;
+
+      var refillTbody = document.querySelector('#refill-history-table tbody');
+      if (refillTbody) {
+        refillTbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังดึงและวิเคราะห์ประวัติการเติมสารเคมี...</td></tr>';
+      }
+
+      var startIso = startDate.toISOString();
+      var stopIso = endDate.toISOString();
+
+      var flux = 'from(bucket: "' + INFLUX_CONFIG.bucket + '")\n' +
+                 '  |> range(start: ' + startIso + ', stop: ' + stopIso + ')\n' +
+                 '  |> filter(fn: (r) => r._measurement == "' + INFLUX_CONFIG.measurement + '")\n' +
+                 '  |> filter(fn: (r) => r._field =~ /volume$/)\n' +
+                 '  |> aggregateWindow(every: ' + aggWindow + ', fn: mean, createEmpty: false)\n' +
+                 '  |> yield(name: "mean")';
+
+      try {
+        var csv = await queryInflux(flux);
+        var parsedSeries = parseTimeSeriesCsv(csv);
+        tankHistoryPoints = parsedSeries;
+
+        // ตรวจจับเหตุการณ์เติมสารเคมีตามเงื่อนไข: ปริมาณเพิ่มขึ้น >= 10%
+        var allRefills = detectRefillsFromPoints(parsedSeries, 10.0);
+        detectedRefillEvents = allRefills;
+
+        // กรองตามสารเคมีที่เลือก
+        var filteredRefills = allRefills.filter(function(r) {
+          if (selectedChem === 'ALL') return true;
+          return r.tankKey === selectedChem;
         });
 
-        // จัดการเมื่อเปลี่ยนตัวกรอง
-        document.getElementById('typeFilter').addEventListener('change', updateDashboard);
+        renderRefillTableAndKPI(filteredRefills);
+        renderHistoricalTrendChart(parsedSeries, selectedChem, daySpan);
 
-        // ฟังก์ชันแสดงและซ่อน Error (แทน alert ที่โดนบล็อกใน iframe)
-        function showError(message) {
-            document.getElementById('errorText').textContent = message;
-            document.getElementById('errorNotification').classList.remove('hidden');
+      } catch (err) {
+        console.error('Error in filterTankHistory:', err);
+        if (refillTbody) {
+          refillTbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-danger"><i class="bi bi-exclamation-triangle me-1"></i>เกิดข้อผิดพลาดในการดึงข้อมูล: ' + err.message + '</td></tr>';
         }
+      }
+    }
 
-        function closeError() {
-            document.getElementById('errorNotification').classList.add('hidden');
+    // แปลง CSV อนุกรมเวลาจาก InfluxDB เป็นชุดข้อมูลแยกตาม Field
+    function parseTimeSeriesCsv(csvText) {
+      var series = {};
+      var lines = csvText.trim().split('\n');
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line || line.startsWith('#')) continue;
+        var parts = line.split(',');
+        if (parts.length >= 8 && parts[6] && !isNaN(parseFloat(parts[6]))) {
+          var time = parts[5];
+          var val = parseFloat(parts[6]);
+          var field = parts[7] ? parts[7].trim().toLowerCase() : '';
+          if (!series[field]) series[field] = [];
+          series[field].push({ time: time, val: val });
         }
+      }
+      return series;
+    }
 
-        // ฟังก์ชันดึงข้อมูลจาก URL
-        function fetchDataFromUrl(url) {
-            const loadingOverlay = document.getElementById('loadingOverlay');
-            loadingOverlay.style.display = 'flex'; // แสดงหน้าต่างโหลด
-            closeError(); // ซ่อน error ก่อนเริ่มดึงข้อมูลใหม่
+    // อัลกอริทึมตรวจจับการเติมสารเคมี (เงื่อนไข: ปริมาณเพิ่มขึ้นจากเดิม >= 10% พร้อมรวมรอบการปั๊มต่อเนื่อง)
+    function detectRefillsFromPoints(pointsByField, thresholdPct) {
+      if (thresholdPct === undefined) thresholdPct = 10.0;
+      var events = [];
+      var fieldToKey = {
+        'naoh50.volume': 'NaOH50',
+        'ls9.volume': 'LS9',
+        'ud1.volume': 'UD1',
+        'las.volume': 'LAS',
+        'di.volume': 'DI'
+      };
 
-            // ใช้ CORS Proxy เพื่อแก้ปัญหาเบราว์เซอร์บล็อกการดึงข้อมูลข้ามโดเมน (CORS Issue)
-            const proxyUrl = "https://api.allorigins.win/raw?url=" + encodeURIComponent(url);
+      for (var f in pointsByField) {
+        var pts = pointsByField[f];
+        if (!pts || pts.length < 2) continue;
 
-            Papa.parse(proxyUrl, {
-                download: true,
-                header: true,
-                skipEmptyLines: true,
-                complete: function(results) {
-                    // กรองแถวที่ไม่มีข้อมูลสำคัญออก เพื่อป้องกันแถวว่างหลุดเข้ามา
-                    rawData = results.data.filter(row => row['ประเภท'] || row['สถานที่ติดตั้ง']);
-                    
-                    if (rawData.length > 0) {
-                        processData();
-                    } else {
-                        showError("ดึงข้อมูลสำเร็จ แต่ไม่พบข้อมูลในชีต หรือรูปแบบคอลัมน์อาจไม่ตรงกัน (ตรวจไม่พบหัวคอลัมน์ 'ประเภท' หรือ 'สถานที่ติดตั้ง')");
-                        updateDashboard(); // รีเซ็ตหน้าจอให้ว่าง
-                    }
-                    
-                    loadingOverlay.style.display = 'none'; // ซ่อนหน้าต่างโหลด
-                },
-                error: function(err) {
-                    loadingOverlay.style.display = 'none'; // ซ่อนหน้าต่างโหลด
-                    showError("เกิดข้อผิดพลาดในการดึงข้อมูล: " + err.message + " | กรุณาตรวจสอบลิงก์ CSV อีกครั้ง");
-                }
-            });
-        }
+        pts.sort(function(a, b) { return new Date(a.time) - new Date(b.time); });
 
-        // กระบวนการหลักในการเตรียมข้อมูล
-        function processData() {
-            // ดึงประเภททั้งหมดแบบไม่ซ้ำ เพื่อสร้างตัวกรอง
-            const types = [...new Set(rawData.map(item => item['ประเภท']?.trim()).filter(Boolean))].sort();
-            
-            const filterSelect = document.getElementById('typeFilter');
-            filterSelect.innerHTML = '<option value="all">-- ทุกประเภท --</option>';
-            
-            types.forEach(type => {
-                const option = document.createElement('option');
-                option.value = type;
-                option.textContent = type;
-                filterSelect.appendChild(option);
-            });
+        var inRefill = false;
+        var startPt = null;
+        var endPt = null;
 
-            // รีเซ็ตตัวกรองเป็น "ทั้งหมด" แล้วอัปเดตแดชบอร์ด
-            filterSelect.value = 'all';
-            updateDashboard();
-        }
+        for (var i = 1; i < pts.length; i++) {
+          var prev = pts[i - 1];
+          var curr = pts[i];
+          var delta = curr.val - prev.val;
+          var stepPct = prev.val > 0 ? (delta / prev.val * 100) : 0;
 
-        // ฟังก์ชันอัปเดตข้อมูลบนหน้าจอตาม Filter
-        function updateDashboard() {
-            const selectedType = document.getElementById('typeFilter').value;
-            
-            // กรองข้อมูล
-            if (selectedType === 'all') {
-                filteredData = [...rawData];
-            } else {
-                filteredData = rawData.filter(item => item['ประเภท']?.trim() === selectedType);
+          // หากระดับของเหลวเพิ่มขึ้นอย่างมีนัยสำคัญ หรือกำลังอยู่ในช่วงการปั๊มเติมต่อเนื่อง
+          if (delta > 50 && (stepPct >= 5.0 || (inRefill && delta > 0))) {
+            if (!inRefill) {
+              inRefill = true;
+              startPt = prev;
             }
-
-            // อัปเดตตัวเลขการแสดงผล
-            document.getElementById('totalCount').textContent = rawData.length.toLocaleString();
-            document.getElementById('currentCount').textContent = filteredData.length.toLocaleString();
-
-            updateKPIs();
-            renderTable();
-            renderCharts();
-        }
-
-        // ฟังก์ชันอัปเดต KPI
-        function updateKPIs() {
-            // KPI 1: จำนวนทั้งหมด
-            document.getElementById('kpiTotal').textContent = filteredData.length.toLocaleString();
-
-            // KPI 2: สถานที่ติดตั้งไม่ซ้ำ
-            const uniqueLocations = new Set(filteredData.map(item => item['สถานที่ติดตั้ง']?.trim()).filter(Boolean));
-            document.getElementById('kpiLocations').textContent = uniqueLocations.size.toLocaleString();
-
-            // KPI 3: ประเภทสูงสุด
-            if (filteredData.length > 0) {
-                const typeCounts = {};
-                filteredData.forEach(item => {
-                    const type = item['ประเภท']?.trim() || 'ไม่ระบุ';
-                    typeCounts[type] = (typeCounts[type] || 0) + 1;
-                });
-                
-                let topType = '-';
-                let maxCount = 0;
-                for (const [type, count] of Object.entries(typeCounts)) {
-                    if (count > maxCount) {
-                        maxCount = count;
-                        topType = type;
-                    }
-                }
-                document.getElementById('kpiTopType').textContent = `${topType} (${maxCount.toLocaleString()})`;
-            } else {
-                document.getElementById('kpiTopType').textContent = '-';
+            endPt = curr;
+          } else {
+            if (inRefill) {
+              pushEvent(f, startPt, endPt);
+              inRefill = false;
+              startPt = null;
+              endPt = null;
             }
+          }
         }
 
-        // ฟังก์ชันสร้างตาราง
-        function renderTable() {
-            const tbody = document.getElementById('dataTableBody');
-            const noDataMsg = document.getElementById('noDataMessage');
-            tbody.innerHTML = '';
+        if (inRefill && startPt && endPt) {
+          pushEvent(f, startPt, endPt);
+        }
+      }
 
-            if (filteredData.length === 0) {
-                noDataMsg.classList.remove('hidden');
-            } else {
-                noDataMsg.classList.add('hidden');
-                
-                filteredData.forEach(item => {
-                    const tr = document.createElement('tr');
-                    tr.className = 'bg-white hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-0';
-                    tr.innerHTML = `
-                        <td class="px-6 py-3 whitespace-nowrap text-gray-900">${item['ลำดับ'] || '-'}</td>
-                        <td class="px-6 py-3 text-gray-700">${item['สถานที่ติดตั้ง'] || '-'}</td>
-                        <td class="px-6 py-3 text-gray-700">${item['ชื่ออุปกรณ์'] || '-'}</td>
-                        <td class="px-6 py-3 text-gray-700">${item['เลขที่ serial'] || item['เลขที่ Serial'] || '-'}</td>
-                        <td class="px-6 py-3 whitespace-nowrap text-gray-700">${item['วันที่'] || '-'}</td>
-                        <td class="px-6 py-3 whitespace-nowrap">
-                            <span class="px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200 shadow-sm">
-                                ${item['ประเภท'] || '-'}
-                            </span>
-                        </td>
-                    `;
-                    tbody.appendChild(tr);
-                });
+      function pushEvent(field, startPt, endPt) {
+        var added = endPt.val - startPt.val;
+        var totalPct = startPt.val > 0 ? (added / startPt.val * 100) : 0;
+        if (totalPct >= thresholdPct && added >= 100) {
+          var startD = new Date(startPt.time);
+          var endD = new Date(endPt.time);
+          var durMins = Math.max(1, Math.round((endD - startD) / (1000 * 60)));
+          var tankKey = fieldToKey[field.toLowerCase()] || field;
+          var spec = TANK_SPECS[tankKey] || { name: field, shortName: field, color: '#38bdf8', icon: '🛢️' };
+
+          events.push({
+            field: field,
+            tankKey: tankKey,
+            chemName: spec.name,
+            shortName: spec.shortName,
+            icon: spec.icon,
+            color: spec.color,
+            startTime: startPt.time,
+            endTime: endPt.time,
+            durationMins: durMins,
+            beforeVol: startPt.val,
+            afterVol: endPt.val,
+            addedVol: added,
+            pct: totalPct
+          });
+        }
+      }
+
+      // เรียงลำดับจากล่าสุดไปเก่าสุด
+      events.sort(function(a, b) { return new Date(b.startTime) - new Date(a.startTime); });
+      return events;
+    }
+
+    // ตัวแปร Pagination สำหรับประวัติการเติม
+    let currentRefillList = [];
+    let currentRefillPage = 1;
+    const REFILL_PAGE_SIZE = 20;
+
+    // แสดงผลตารางประวัติการเติมและการ์ดสรุป KPI การเติม
+    function renderRefillTableAndKPI(refills) {
+      currentRefillList = refills || [];
+      currentRefillPage = 1;
+
+      var totalTimesEl = document.getElementById('refill-total-times');
+      var totalVolEl = document.getElementById('refill-total-vol');
+      var latestInfoEl = document.getElementById('refill-latest-info');
+      var countTextEl = document.getElementById('refill-count-text');
+
+      var totalTimes = currentRefillList.length;
+      var totalVol = 0;
+      currentRefillList.forEach(function(r) { totalVol += r.addedVol; });
+
+      if (totalTimesEl) totalTimesEl.innerText = totalTimes.toLocaleString();
+      if (totalVolEl) totalVolEl.innerText = '+' + Number(totalVol.toFixed(1)).toLocaleString();
+      if (countTextEl) countTextEl.innerHTML = 'พบ <b class="text-warning fs-6">' + totalTimes + '</b> รายการ (แสดงหน้าละ 20 รายการ)';
+
+      if (latestInfoEl) {
+        if (currentRefillList.length > 0) {
+          var latest = currentRefillList[0];
+          var timeStr = new Date(latest.startTime).toLocaleString('th-TH', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+          latestInfoEl.innerHTML = latest.shortName + ' <span class="text-success fw-bold">(+' + Number(latest.addedVol.toFixed(0)).toLocaleString() + ' L)</span> <small class="text-light fw-normal">' + timeStr + '</small>';
+        } else {
+          latestInfoEl.innerText = 'ไม่มีประวัติการเติมในช่วงเวลานี้';
+        }
+      }
+
+      renderRefillTablePage(1);
+    }
+
+    // ฟังก์ชันเรนเดอร์ตารางประวัติการเติมตามหน้า (Pagination: 20 รายการต่อหน้า)
+    function renderRefillTablePage(page) {
+      var tbody = document.querySelector('#refill-history-table tbody');
+      var paginationWrapper = document.getElementById('refill-pagination-wrapper');
+      if (!tbody) return;
+
+      var totalRecords = currentRefillList.length;
+      if (totalRecords === 0) {
+        tbody.innerHTML = '<tr><td colspan="10" class="text-center py-4 text-light"><i class="bi bi-info-circle text-info me-2"></i>ไม่พบประวัติการเติมสารเคมีที่ปริมาณเพิ่มขึ้น ≥ 10% ในช่วงเวลาที่เลือก</td></tr>';
+        if (paginationWrapper) paginationWrapper.style.setProperty('display', 'none', 'important');
+        return;
+      }
+
+      var totalPages = Math.ceil(totalRecords / REFILL_PAGE_SIZE);
+      currentRefillPage = Math.max(1, Math.min(page, totalPages));
+
+      var startIndex = (currentRefillPage - 1) * REFILL_PAGE_SIZE;
+      var endIndex = Math.min(startIndex + REFILL_PAGE_SIZE, totalRecords);
+      var pageRows = currentRefillList.slice(startIndex, endIndex);
+
+      var html = '';
+      pageRows.forEach(function(r, index) {
+        var startD = new Date(r.startTime);
+        var endD = new Date(r.endTime);
+
+        var pad = function(n) { return n < 10 ? '0' + n : n; };
+        var startStr = pad(startD.getDate()) + '/' + pad(startD.getMonth() + 1) + '/' + startD.getFullYear() + ' ' + pad(startD.getHours()) + ':' + pad(startD.getMinutes());
+        var endStr = pad(endD.getHours()) + ':' + pad(endD.getMinutes());
+
+        html += '<tr>' +
+          '<td class="col-idx">' + (startIndex + index + 1) + '</td>' +
+          '<td class="text-center font-monospace small text-white fw-bold">' + startStr + '</td>' +
+          '<td class="text-center font-monospace small text-light">' + endStr + ' น.</td>' +
+          '<td class="text-center small text-info fw-semibold">' + r.durationMins + ' นาที</td>' +
+          '<td class="text-start ps-3">' +
+            '<span class="me-1">' + r.icon + '</span>' +
+            '<b class="text-white">' + r.chemName + '</b>' +
+            '<span class="badge bg-dark border border-secondary text-info ms-2">' + r.shortName + '</span>' +
+          '</td>' +
+          '<td class="text-num text-light">' + Number(r.beforeVol.toFixed(1)).toLocaleString() + '</td>' +
+          '<td class="text-num text-white fw-semibold">' + Number(r.afterVol.toFixed(1)).toLocaleString() + '</td>' +
+          '<td class="text-num fw-bold fs-6 text-success">+' + Number(r.addedVol.toFixed(1)).toLocaleString() + '</td>' +
+          '<td class="text-center"><span class="badge bg-success text-white border border-success fw-bold fs-6">+' + r.pct.toFixed(1) + '%</span></td>' +
+          '<td class="text-center"><span class="badge bg-success-subtle text-success border border-success"><i class="bi bi-check-circle me-1"></i>เติมสารสำเร็จ</span></td>' +
+        '</tr>';
+      });
+
+      tbody.innerHTML = html;
+
+      // จัดการแสดงผล Pagination
+      if (totalRecords > REFILL_PAGE_SIZE) {
+        if (paginationWrapper) {
+          paginationWrapper.style.setProperty('display', 'flex', 'important');
+          var infoEl = document.getElementById('refill-pagination-info');
+          if (infoEl) {
+            infoEl.innerText = 'แสดงรายการที่ ' + (startIndex + 1).toLocaleString() + ' ถึง ' + endIndex.toLocaleString() + ' จากทั้งหมด ' + totalRecords.toLocaleString() + ' รายการ (หน้า ' + currentRefillPage + ' จาก ' + totalPages + ')';
+          }
+          renderRefillPaginationButtons(totalPages, currentRefillPage);
+        }
+      } else {
+        if (paginationWrapper) paginationWrapper.style.setProperty('display', 'none', 'important');
+      }
+    }
+
+    // ฟังก์ชันสร้างปุ่มเลื่อนหน้า << หน้า >> สำหรับประวัติการเติม
+    function renderRefillPaginationButtons(totalPages, page) {
+      var container = document.getElementById('refill-pagination-buttons');
+      if (!container) return;
+
+      var html = '';
+
+      // ปุ่มแรก และ ปุ่มก่อนหน้า
+      if (page > 1) {
+        html += '<button type="button" class="btn btn-sm btn-outline-secondary text-white py-1 px-2" onclick="goToRefillPage(1)" title="หน้าแรก"><i class="bi bi-chevron-double-left"></i></button>';
+        html += '<button type="button" class="btn btn-sm btn-outline-secondary text-white py-1 px-2" onclick="goToRefillPage(' + (page - 1) + ')" title="ก่อนหน้า"><i class="bi bi-chevron-left"></i></button>';
+      } else {
+        html += '<button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2 disabled text-secondary" disabled><i class="bi bi-chevron-double-left"></i></button>';
+        html += '<button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2 disabled text-secondary" disabled><i class="bi bi-chevron-left"></i></button>';
+      }
+
+      var startBtn = Math.max(1, page - 2);
+      var endBtn = Math.min(totalPages, page + 2);
+
+      if (startBtn > 1) {
+        html += '<span class="px-1 text-light">...</span>';
+      }
+
+      for (var p = startBtn; p <= endBtn; p++) {
+        if (p === page) {
+          html += '<button type="button" class="btn btn-sm btn-primary fw-bold py-1 px-3 active">' + p + '</button>';
+        } else {
+          html += '<button type="button" class="btn btn-sm btn-outline-secondary text-white py-1 px-3" onclick="goToRefillPage(' + p + ')">' + p + '</button>';
+        }
+      }
+
+      if (endBtn < totalPages) {
+        html += '<span class="px-1 text-light">...</span>';
+      }
+
+      // ปุ่มถัดไป และ ปุ่มสุดท้าย
+      if (page < totalPages) {
+        html += '<button type="button" class="btn btn-sm btn-outline-secondary text-white py-1 px-2" onclick="goToRefillPage(' + (page + 1) + ')" title="ถัดไป"><i class="bi bi-chevron-right"></i></button>';
+        html += '<button type="button" class="btn btn-sm btn-outline-secondary text-white py-1 px-2" onclick="goToRefillPage(' + totalPages + ')" title="หน้าสุดท้าย"><i class="bi bi-chevron-double-right"></i></button>';
+      } else {
+        html += '<button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2 disabled text-secondary" disabled><i class="bi bi-chevron-right"></i></button>';
+        html += '<button type="button" class="btn btn-sm btn-outline-secondary py-1 px-2 disabled text-secondary" disabled><i class="bi bi-chevron-double-right"></i></button>';
+      }
+
+      container.innerHTML = html;
+    }
+
+    // ฟังก์ชันเปลี่ยนหน้าตารางประวัติการเติม
+    function goToRefillPage(page) {
+      renderRefillTablePage(page);
+    }
+
+    // วาดกราฟแนวโน้มระดับสต็อกสารเคมีย้อนหลังตามช่วงเวลาที่กรอง (Historical Stock Trend Chart)
+    function renderHistoricalTrendChart(pointsByField, selectedChem, daySpan) {
+      var timeMap = new Map();
+      var fieldToKey = {
+        'naoh50.volume': 'NaOH50',
+        'ls9.volume': 'LS9',
+        'ud1.volume': 'UD1',
+        'las.volume': 'LAS',
+        'di.volume': 'DI'
+      };
+
+      for (var f in pointsByField) {
+        var pts = pointsByField[f];
+        pts.forEach(function(p) {
+          if (!timeMap.has(p.time)) {
+            var d = new Date(p.time);
+            var pad = function(n) { return n < 10 ? '0' + n : n; };
+            // ถ้าช่วงวันมากกว่า 2 วัน ให้แสดง ว/ด ในแกน x ด้วย
+            var label = (daySpan > 2) ? (pad(d.getDate()) + '/' + pad(d.getMonth() + 1) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes())) : (pad(d.getHours()) + ':' + pad(d.getMinutes()));
+            timeMap.set(p.time, { label: label, values: {} });
+          }
+          timeMap.get(p.time).values[f] = p.val;
+        });
+      }
+
+      var sortedKeys = Array.from(timeMap.keys()).sort();
+      var labels = sortedKeys.map(function(k) { return timeMap.get(k).label; });
+
+      var allDefs = [
+        { label: 'CAUSTIC SODA 50%', fieldKey: 'naoh50.volume', tankKey: 'NaOH50', color: TANK_SPECS.NaOH50.color },
+        { label: 'LS9 (Surfactant)', fieldKey: 'ls9.volume', tankKey: 'LS9', color: TANK_SPECS.LS9.color },
+        { label: 'UD1 (Polymer)', fieldKey: 'ud1.volume', tankKey: 'UD1', color: TANK_SPECS.UD1.color },
+        { label: 'LAS (Acid)', fieldKey: 'las.volume', tankKey: 'LAS', color: TANK_SPECS.LAS.color },
+        { label: 'DI Water', fieldKey: 'di.volume', tankKey: 'DI', color: TANK_SPECS.DI.color }
+      ];
+
+      var datasets = [];
+      allDefs.forEach(function(item) {
+        if (selectedChem !== 'ALL' && selectedChem !== item.tankKey) return;
+        datasets.push({
+          label: item.label,
+          fieldKey: item.fieldKey,
+          borderColor: item.color,
+          backgroundColor: 'transparent',
+          borderWidth: (selectedChem !== 'ALL') ? 3.5 : 2.2,
+          tension: 0.25,
+          pointRadius: sortedKeys.length > 200 ? 0 : 2,
+          pointHoverRadius: 5,
+          data: sortedKeys.map(function(k) {
+            var v = timeMap.get(k).values[item.fieldKey];
+            return v !== undefined ? Number(v.toFixed(1)) : null;
+          })
+        });
+      });
+
+      var canvas = document.getElementById('tankTrendChart');
+      if (!canvas) return;
+      var ctx = canvas.getContext('2d');
+
+      if (tankTrendChartInstance) {
+        tankTrendChartInstance.data.labels = labels;
+        tankTrendChartInstance.data.datasets = datasets;
+        tankTrendChartInstance.update();
+      } else {
+        tankTrendChartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: datasets
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: {
+                position: 'top',
+                labels: {
+                  color: '#e2e8f0',
+                  boxWidth: 14,
+                  padding: 14,
+                  font: { size: 12, weight: 600 }
+                }
+              },
+              tooltip: {
+                backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                titleColor: '#38bdf8',
+                bodyColor: '#ffffff',
+                borderColor: '#334155',
+                borderWidth: 1,
+                padding: 10,
+                callbacks: {
+                  label: function(context) {
+                    return context.dataset.label + ': ' + Number(context.parsed.y).toLocaleString() + ' L';
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                ticks: { color: '#94a3b8', maxRotation: 0, autoSkip: true, maxTicksLimit: 14 },
+                grid: { color: '#334155' }
+              },
+              y: {
+                ticks: {
+                  color: '#94a3b8',
+                  callback: function(val) { return Number(val).toLocaleString() + ' L'; }
+                },
+                grid: { color: '#334155' }
+              }
             }
-        }
+          }
+        });
+      }
+    }
 
-        // ฟังก์ชันสร้างกราฟ
-        function renderCharts() {
-            // ทำลายกราฟเก่าถ้ามี เพื่อวาดใหม่
-            if (chartInstances.type) chartInstances.type.destroy();
-            if (chartInstances.trend) chartInstances.trend.destroy();
+    // ฟังก์ชันส่งออกประวัติการเติมสารเคมีลงแท็งก์เป็นไฟล์ Excel (.xlsx)
+    function exportRefillToExcel() {
+      if (!detectedRefillEvents || detectedRefillEvents.length === 0) {
+        alert('ไม่พบข้อมูลประวัติการเติมสารเคมีสำหรับส่งออก Excel');
+        return;
+      }
+      if (typeof XLSX === 'undefined') {
+        alert('ระบบกำลังโหลดไลบรารี Excel กรุณาลองใหม่อีกครั้ง');
+        return;
+      }
 
-            if (filteredData.length === 0) return;
+      var wb = XLSX.utils.book_new();
+      var data = [
+        ['รายงานประวัติการเติมสารเคมีลงแท็งก์ (CHEMICAL TANK REFILL HISTORY LOG)'],
+        ['แหล่งข้อมูล: InfluxDB Cloud (Organization: PP_Factory / Bucket: tank fram)'],
+        ['เกณฑ์การตรวจจับ: ปริมาณเพิ่มขึ้นจากเดิม ≥ 10%'],
+        ['วันที่ออกรายงาน: ' + new Date().toLocaleString('th-TH')],
+        [],
+        ['ลำดับ', 'วัน-เวลาเริ่มเติม', 'เวลาเสร็จสิ้น', 'ระยะเวลา (นาที)', 'ชื่อถัง/สารเคมี', 'ก่อนเติม (L)', 'หลังเติม (L)', 'ปริมาณที่เติม (+L)', '% ที่เพิ่มขึ้น', 'สถานะ']
+      ];
 
-            // --- เตรียมข้อมูลสำหรับกราฟแท่ง (ตามประเภท) ---
-            const typeCounts = {};
-            filteredData.forEach(item => {
-                const type = item['ประเภท']?.trim() || 'ไม่ระบุ';
-                typeCounts[type] = (typeCounts[type] || 0) + 1;
-            });
-            
-            // เรียงลำดับจากมากไปน้อย (แสดงแค่ 10 อันดับแรกเพื่อให้กราฟดูง่าย)
-            const sortedTypes = Object.entries(typeCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
-            
-            const typeLabels = sortedTypes.map(item => item[0]);
-            const typeData = sortedTypes.map(item => item[1]);
+      detectedRefillEvents.forEach(function(r, idx) {
+        data.push([
+          idx + 1,
+          new Date(r.startTime).toLocaleString('th-TH'),
+          new Date(r.endTime).toLocaleTimeString('th-TH'),
+          r.durationMins,
+          r.chemName,
+          Number(r.beforeVol.toFixed(1)),
+          Number(r.afterVol.toFixed(1)),
+          Number(r.addedVol.toFixed(1)),
+          '+' + r.pct.toFixed(1) + '%',
+          'เติมสารสำเร็จ'
+        ]);
+      });
 
-            const ctxType = document.getElementById('typeChart').getContext('2d');
-            chartInstances.type = new Chart(ctxType, {
-                type: 'bar',
-                data: {
-                    labels: typeLabels,
-                    datasets: [{
-                        label: 'จำนวนรายการ',
-                        data: typeData,
-                        backgroundColor: 'rgba(59, 130, 246, 0.7)',
-                        borderColor: 'rgba(59, 130, 246, 1)',
-                        borderWidth: 1,
-                        borderRadius: 4
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, ticks: { stepSize: Math.ceil(Math.max(...typeData)/10) || 1 } }
-                    }
-                }
-            });
+      var ws = XLSX.utils.aoa_to_sheet(data);
+      ws['!cols'] = [
+        { wch: 8 }, { wch: 22 }, { wch: 14 }, { wch: 16 }, { wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 20 }, { wch: 15 }, { wch: 18 }
+      ];
+      XLSX.utils.book_append_sheet(wb, ws, 'ประวัติการเติมสารเคมี');
 
-            // --- เตรียมข้อมูลสำหรับกราฟเส้น (แนวโน้มรายปี) ---
-            const yearCounts = {};
-            filteredData.forEach(item => {
-                const dateStr = item['วันที่']?.trim();
-                let year = 'ไม่ระบุ';
-                if (dateStr) {
-                    // รูปแบบวันที่มักจะเป็น D/M/YYYY
-                    const parts = dateStr.split('/');
-                    if (parts.length === 3) {
-                        year = parts[2]; // ดึงปีออกมา
-                    }
-                }
-                yearCounts[year] = (yearCounts[year] || 0) + 1;
-            });
+      var fileName = 'PP_Tank_Refill_History_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+      XLSX.writeFile(wb, fileName);
+    }
 
-            // กรอง "ไม่ระบุ" ออกถ้าเราต้องการดูแค่ปีจริงๆ และเรียงลำดับปี
-            const sortedYears = Object.entries(yearCounts)
-                .filter(item => item[0] !== 'ไม่ระบุ' && item[0].length === 4)
-                .sort((a, b) => a[0].localeCompare(b[0]));
-                
-            const yearLabels = sortedYears.map(item => item[0]);
-            const yearData = sortedYears.map(item => item[1]);
+    // ฟังก์ชันส่งออกสต็อกสารเคมีในแท็งก์เป็น Excel (.xlsx) (ส่งออกทั้งสต็อกปัจจุบันและประวัติการเติม)
+    function exportTankToExcel() {
+      if (!latestTankData) {
+        alert('ยังไม่มีข้อมูลแท็งก์สำหรับส่งออก Excel');
+        return;
+      }
+      if (typeof XLSX === 'undefined') {
+        alert('ระบบกำลังโหลดไลบรารี Excel กรุณาลองใหม่อีกครั้ง');
+        return;
+      }
 
-            const ctxTrend = document.getElementById('trendChart').getContext('2d');
-            chartInstances.trend = new Chart(ctxTrend, {
-                type: 'line',
-                data: {
-                    labels: yearLabels,
-                    datasets: [{
-                        label: 'จำนวนที่ส่งออก',
-                        data: yearData,
-                        backgroundColor: 'rgba(16, 185, 129, 0.2)',
-                        borderColor: 'rgba(16, 185, 129, 1)',
-                        borderWidth: 2,
-                        pointBackgroundColor: 'rgba(16, 185, 129, 1)',
-                        pointHoverRadius: 6,
-                        pointRadius: 4,
-                        fill: true,
-                        tension: 0.3
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: { legend: { display: false } },
-                    scales: {
-                        y: { beginAtZero: true, ticks: { stepSize: Math.ceil(Math.max(...yearData)/5) || 1 } }
-                    }
-                }
-            });
-        }
-    </script>
+      var wb = XLSX.utils.book_new();
+
+      // แผ่นที่ 1: สต็อกสารเคมีคงเหลือปัจจุบัน
+      var stockData = [
+        ['รายงานปริมาณสารเคมีในแท็งก์ (PP TANK FARM INVENTORY REPORT)'],
+        ['แหล่งข้อมูล: InfluxDB Cloud (Organization: PP_Factory / Bucket: tank fram)'],
+        ['วันที่ออกรายงาน: ' + new Date().toLocaleString('th-TH')],
+        [],
+        ['ลำดับ', 'ชื่อถัง / สารเคมี', 'ปริมาณคงเหลือ (L)', 'ความจุถัง (L)', 'ระดับคงเหลือ (%)', 'พื้นที่ว่างรับได้ (L)', 'อุณหภูมิ (°C)', 'เวลาตรวจวัดล่าสุด', 'สถานะ']
+      ];
+
+      var idx = 1;
+      for (var k in TANK_SPECS) {
+        var spec = TANK_SPECS[k];
+        var item = latestTankData[k] || { volume: 0, temp: 0, time: '' };
+        var pct = spec.maxCapacity > 0 ? (item.volume / spec.maxCapacity * 100) : 0;
+        var ullage = Math.max(0, spec.maxCapacity - item.volume);
+        var status = pct < 15 ? 'ระดับต่ำ - ต้องเติมสาร' : (pct < 30 ? 'ระดับปานกลาง' : 'ระดับปกติ');
+        var timeStr = item.time ? new Date(item.time).toLocaleString('th-TH') : '-';
+
+        stockData.push([
+          idx++,
+          spec.name,
+          Number(item.volume.toFixed(2)),
+          spec.maxCapacity,
+          Number(pct.toFixed(1)) + '%',
+          Number(ullage.toFixed(2)),
+          Number(item.temp.toFixed(1)),
+          timeStr,
+          status
+        ]);
+      }
+
+      var wsStock = XLSX.utils.aoa_to_sheet(stockData);
+      wsStock['!cols'] = [
+        { wch: 8 }, { wch: 28 }, { wch: 18 }, { wch: 16 }, { wch: 18 }, { wch: 20 }, { wch: 14 }, { wch: 24 }, { wch: 20 }
+      ];
+      XLSX.utils.book_append_sheet(wb, wsStock, 'สต็อกสารเคมีในแท็งก์');
+
+      // แผ่นที่ 2: ประวัติการเติมสารเคมีลงแท็งก์
+      if (detectedRefillEvents && detectedRefillEvents.length > 0) {
+        var refillData = [
+          ['รายงานประวัติการเติมสารเคมีลงแท็งก์ (TANK REFILL HISTORY)'],
+          ['เกณฑ์การตรวจจับ: ปริมาณเพิ่มขึ้นจากเดิม ≥ 10%'],
+          [],
+          ['ลำดับ', 'วัน-เวลาเริ่มเติม', 'เวลาเสร็จสิ้น', 'ระยะเวลา (นาที)', 'ชื่อถัง/สารเคมี', 'ก่อนเติม (L)', 'หลังเติม (L)', 'ปริมาณที่เติม (+L)', '% ที่เพิ่มขึ้น', 'สถานะ']
+        ];
+        detectedRefillEvents.forEach(function(r, rIdx) {
+          refillData.push([
+            rIdx + 1,
+            new Date(r.startTime).toLocaleString('th-TH'),
+            new Date(r.endTime).toLocaleTimeString('th-TH'),
+            r.durationMins,
+            r.chemName,
+            Number(r.beforeVol.toFixed(1)),
+            Number(r.afterVol.toFixed(1)),
+            Number(r.addedVol.toFixed(1)),
+            '+' + r.pct.toFixed(1) + '%',
+            'เติมสารสำเร็จ'
+          ]);
+        });
+        var wsRefill = XLSX.utils.aoa_to_sheet(refillData);
+        wsRefill['!cols'] = [
+          { wch: 8 }, { wch: 22 }, { wch: 14 }, { wch: 16 }, { wch: 28 }, { wch: 16 }, { wch: 16 }, { wch: 20 }, { wch: 15 }, { wch: 18 }
+        ];
+        XLSX.utils.book_append_sheet(wb, wsRefill, 'ประวัติการเติมสารเคมี');
+      }
+
+      var fileName = 'PP_Tank_Farm_Report_' + new Date().toISOString().slice(0, 10) + '.xlsx';
+      XLSX.writeFile(wb, fileName);
+    }
+  </script>
 </body>
 </html>
