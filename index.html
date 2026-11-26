@@ -528,21 +528,41 @@
       #zebra-print-area {
         display: block !important;
         position: fixed !important;
-        left: 0 !important;
-        top: 0 !important;
-        width: 70mm !important;
-        height: 40mm !important;
+        left: 2.5mm !important;
+        top: 2mm !important;
+        width: 65mm !important;
+        height: 35mm !important;
         margin: 0 !important;
-        padding: 1.5mm 2.2mm !important;
+        padding: 0 !important;
         box-sizing: border-box !important;
         background: #ffffff !important;
         color: #000000 !important;
+        overflow: hidden !important;
         font-family: Arial, Tahoma, -apple-system, sans-serif !important;
       }
     }
 
     #zebra-print-area {
       display: none;
+    }
+
+    #lbl-qrcode, #prev-qrcode {
+      position: relative;
+      overflow: hidden;
+    }
+    #lbl-qrcode canvas,
+    #prev-qrcode canvas {
+      width: 100% !important;
+      height: 100% !important;
+      display: block !important;
+      image-rendering: pixelated !important;
+      image-rendering: -moz-crisp-edges !important;
+      image-rendering: crisp-edges !important;
+    }
+    /* ป้องกัน QRCode.js ซ้อน element <img> กับ <canvas> จนทำให้ฉลากขยายล้นขอบล่าง */
+    #lbl-qrcode img,
+    #prev-qrcode img {
+      display: none !important;
     }
 
     /* สไตล์พรีวิวฉลากในหน้าจอ Modal */
@@ -599,8 +619,11 @@
             <label for="auto-refresh-select" class="small fw-semibold text-light mb-0" style="font-size: 13px;"><i class="bi bi-stopwatch text-info me-1"></i>ออโต้:</label>
             <select id="auto-refresh-select" class="form-select form-select-sm py-0 px-2 bg-transparent text-white border-0 fw-semibold" style="width: auto; font-size: 13px; cursor: pointer;" onchange="toggleAutoRefresh(this.value)">
               <option value="0" class="bg-dark text-white">ปิด</option>
-              <option value="15" class="bg-dark text-white">15 วินาที</option>
-              <option value="30" class="bg-dark text-white" selected>30 วินาที</option>
+              <option value="1" class="bg-dark text-white" selected>1 วินาที (ทันที Realtime - แนะนำ)</option>
+              <option value="3" class="bg-dark text-white">3 วินาที</option>
+              <option value="5" class="bg-dark text-white">5 วินาที</option>
+              <option value="10" class="bg-dark text-white">10 วินาที</option>
+              <option value="30" class="bg-dark text-white">30 วินาที</option>
               <option value="60" class="bg-dark text-white">60 วินาที</option>
             </select>
           </div>
@@ -1193,8 +1216,8 @@
                       Diff: <span id="prev-diff">+0.30 kg (+0.15%)</span>
                     </div>
                   </div>
-                  <div style="width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 2px;">
-                    <div id="prev-qrcode" style="width: 66px; height: 66px;"></div>
+                  <div style="width: 78px; height: 78px; display: flex; align-items: center; justify-content: center; background: #fff; border: 1.5px solid #000; border-radius: 4px; padding: 2px; flex-shrink: 0;">
+                    <div id="prev-qrcode" style="width: 74px; height: 74px;"></div>
                   </div>
                 </div>
                 <div style="border-top: 1px dashed #000; padding-top: 2px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 8px;">
@@ -1246,47 +1269,47 @@
     </div>
   </div>
 
-  <!-- DOM Container สำหรับพิมพ์ฉลาก 70mm x 40mm ออกเครื่องพิมพ์ Zebra ZD421 โดยเฉพาะ -->
+  <!-- DOM Container สำหรับพิมพ์ฉลาก 70mm x 40mm ออกเครื่องพิมพ์ Zebra ZD421 โดยเฉพาะ (ขนาดปลอดภัย 65mm x 35mm ขอบเซฟตี้ ไม่ล้นขอบ 100%) -->
   <div id="zebra-print-area">
-    <div style="border: 1.5px solid #000; height: 100%; border-radius: 3px; padding: 1.2mm 2mm; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; position: relative;">
+    <div style="border: 1px solid #000; width: 100%; height: 100%; border-radius: 2px; padding: 1mm 1.2mm; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; background: #fff;">
       
       <!-- หัวฉลาก -->
-      <div style="border-bottom: 1.2px solid #000; padding-bottom: 1px; display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-size: 8.5px; font-weight: 900; letter-spacing: 0.5px;">PP FACTORY - CHEMICAL DISPENSING</span>
-        <span style="font-size: 8px; font-weight: bold; background: #000; color: #fff; padding: 0 4px; border-radius: 2px;" id="lbl-mode">MODE WEIGHT</span>
+      <div style="border-bottom: 0.8px solid #000; padding-bottom: 0.5mm; display: flex; justify-content: space-between; align-items: center; line-height: 1;">
+        <span style="font-size: 7.8px; font-weight: 900; letter-spacing: 0.2px;">PP FACTORY - CHEMICAL DISPENSING</span>
+        <span style="font-size: 7px; font-weight: bold; background: #000; color: #fff; padding: 1px 3px; border-radius: 2px;" id="lbl-mode">MODE WEIGHT</span>
       </div>
 
       <!-- ส่วนกลาง: ชื่อสารเคมี + ข้อมูลน้ำหนัก & QR Code -->
-      <div style="display: flex; justify-content: space-between; align-items: center; margin: 1px 0;">
-        <div style="flex: 1; padding-right: 3px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex: 1; padding: 0.5mm 0; overflow: hidden;">
+        <div style="flex: 1; padding-right: 1.5mm; overflow: hidden;">
           <!-- ชื่อสารเคมี -->
-          <div style="font-size: 12px; font-weight: 900; line-height: 1.1; margin-bottom: 2px; color: #000;" id="lbl-chemical">
+          <div style="font-size: 10.5px; font-weight: 900; line-height: 1.1; margin-bottom: 0.8mm; color: #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" id="lbl-chemical">
             CAUSTIC SODA 50%
           </div>
           <!-- น้ำหนัก Target & Actual -->
-          <div style="font-size: 8.5px; margin-bottom: 1px;">
-            <span>Target: <b id="lbl-target" style="font-size: 9.5px;">200.00</b> kg</span><br>
-            <span>Actual: <b id="lbl-actual" style="font-size: 12px; font-weight: 900;">200.30</b> kg</span>
+          <div style="font-size: 7.5px; line-height: 1.25; margin-bottom: 0.6mm;">
+            <span>Target: <b id="lbl-target" style="font-size: 8.5px;">200.00</b> kg</span><br>
+            <span>Actual: <b id="lbl-actual" style="font-size: 10.5px; font-weight: 900;">200.30</b> kg</span>
           </div>
           <!-- Diff & ผลการยอมรับ -->
-          <div style="font-size: 8px; font-weight: bold;" id="lbl-diff-row">
+          <div style="font-size: 7px; font-weight: bold; line-height: 1.1;" id="lbl-diff-row">
             Diff: <span id="lbl-diff">+0.30 kg (+0.15%)</span>
           </div>
         </div>
 
-        <!-- กล่อง QR Code ด้านขวา -->
-        <div style="width: 22mm; height: 22mm; display: flex; align-items: center; justify-content: center; background: #fff;">
-          <div id="lbl-qrcode" style="width: 20mm; height: 20mm;"></div>
+        <!-- กล่อง QR Code ด้านขวา (ขนาด 17.5mm x 17.5mm ป้องกันการชนหรือทับเส้นประและขอบล่าง 100%) -->
+        <div style="width: 17.5mm; height: 17.5mm; display: flex; align-items: center; justify-content: center; background: #fff; flex-shrink: 0; overflow: hidden;">
+          <div id="lbl-qrcode" style="width: 17mm; height: 17mm; overflow: hidden;"></div>
         </div>
       </div>
 
       <!-- แถวล่างสุด: วันที่เวลา และ ช่องเซ็นชื่อ -->
-      <div style="border-top: 1px dashed #000; padding-top: 1px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 7.5px;">
+      <div style="border-top: 0.8px dashed #000; padding-top: 0.5mm; display: flex; justify-content: space-between; align-items: center; font-size: 6.8px; line-height: 1;">
         <div>
           <span>วัน-เวลา: </span><b id="lbl-datetime">26/11/2026 10:14:34</b>
         </div>
         <div>
-          <span>ผู้แบ่งถ่าย: </span><span style="display: inline-block; width: 20mm; border-bottom: 0.8px solid #000;">&nbsp;</span>
+          <span>ผู้แบ่งถ่าย: </span><span style="display: inline-block; width: 16mm; border-bottom: 0.8px solid #000;">&nbsp;</span>
         </div>
       </div>
 
@@ -1467,8 +1490,8 @@
       loadTankData(true);
       filterTankHistory();
 
-      // เริ่มต้น Auto-Refresh 30 วินาทีตามค่าเริ่มต้นของ Select
-      var autoVal = document.getElementById('auto-refresh-select') ? document.getElementById('auto-refresh-select').value : '30';
+      // เริ่มต้น Auto-Refresh ตามค่าเริ่มต้นของ Select (ค่าเริ่มต้น 1 วินาที Realtime)
+      var autoVal = document.getElementById('auto-refresh-select') ? document.getElementById('auto-refresh-select').value : '1';
       toggleAutoRefresh(autoVal);
 
       // เมื่อผู้ใช้กดสลับมาแท็บแท็งก์ ให้ Chart.js ปรับขนาดให้เต็มหน้าจอพอดี
@@ -1524,6 +1547,13 @@
         var latest = rawData[rawData.length - 1];
         lastPrintedTimestamp = String(latest[0] || '');
         localStorage.setItem('zebraLastPrintedTimestamp', lastPrintedTimestamp);
+
+        // ปรับเวลา Auto-Refresh ให้เร็วสุดอัตโนมัติเป็น 1 วินาที Realtime เพื่อให้ลาเบลออกทันที
+        var autoSelect = document.getElementById('auto-refresh-select');
+        if (autoSelect) {
+          autoSelect.value = '1';
+          toggleAutoRefresh(1);
+        }
       }
     }
 
@@ -1543,13 +1573,41 @@
       try {
         var params = new URLSearchParams(window.location.search);
         if (params.get('v') === '1') {
-          var chem = params.get('c') || 'CHEMICAL';
-          var mode = params.get('m') || 'Mode Weight';
-          var target = params.get('t') || '-';
-          var actual = params.get('a') || '-';
-          var diff = params.get('d') || '-';
-          var dt = params.get('dt') || '-';
-          var st = params.get('st') || 'pass';
+          var cParam = params.get('c') || '';
+          var mParam = params.get('m') || '';
+          var targetStr = params.get('t') || '-';
+          var actualStr = params.get('a') || '-';
+          var dtParam = params.get('d') || params.get('dt') || '-';
+
+          // ขยายรหัสสารเคมีแบบย่อกลับมาเป็นชื่อทางการ
+          var chemMap = {
+            '1': 'CAUSTIC SODA 50%',
+            '2': 'LAS',
+            '3': 'LS9',
+            '4': 'UD1',
+            'NaOH': 'CAUSTIC SODA 50%',
+            'LAS': 'LAS',
+            'LS9': 'LS9',
+            'UD1': 'UD1'
+          };
+          var chem = chemMap[cParam] || cParam || 'CHEMICAL';
+
+          // ขยายโหมด
+          var mode = (mParam === 'W' || mParam === 'w') ? 'Mode Weight' :
+                     (mParam === 'T' || mParam === 't') ? 'Mode Timer' : (mParam || 'Mode Weight');
+
+          // คำนวณผลต่าง Diff และสถานะยอมรับอัตโนมัติ
+          var tNum = parseFloat(targetStr);
+          var aNum = parseFloat(actualStr);
+          var diffText = '-';
+          var isPass = true;
+          if (!isNaN(tNum) && !isNaN(aNum)) {
+            var diff = aNum - tNum;
+            var diffPct = tNum > 0 ? (Math.abs(diff) / tNum) * 100 : 0;
+            isPass = tNum > 0 ? (diffPct <= currentTolerancePercent) : (Math.abs(diff) <= 0.5);
+            var sign = diff > 0 ? '+' : '';
+            diffText = sign + diff.toFixed(2) + ' kg (' + (diff > 0 ? '+' : '') + diffPct.toFixed(1) + '%)';
+          }
 
           var chemEl = document.getElementById('v-chemical');
           var modeEl = document.getElementById('v-mode');
@@ -1561,13 +1619,13 @@
 
           if (chemEl) chemEl.innerText = chem;
           if (modeEl) modeEl.innerText = mode;
-          if (targetEl) targetEl.innerText = target;
-          if (actualEl) actualEl.innerText = actual;
-          if (diffEl) diffEl.innerText = diff;
-          if (dtEl) dtEl.innerText = dt;
+          if (targetEl) targetEl.innerText = (!isNaN(tNum) ? tNum.toFixed(2) : targetStr);
+          if (actualEl) actualEl.innerText = (!isNaN(aNum) ? aNum.toFixed(2) : actualStr);
+          if (diffEl) diffEl.innerText = diffText;
+          if (dtEl) dtEl.innerText = dtParam;
 
           if (badgeEl) {
-            if (st === 'pass') {
+            if (isPass) {
               badgeEl.className = 'badge bg-success-subtle text-success border border-success px-3 py-2 fs-6 rounded-pill shadow-sm';
               badgeEl.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> อยู่ในเกณฑ์ยอมรับ (Pass)';
             } else {
@@ -1597,16 +1655,10 @@
         }
       } catch (e) {}
 
+      targetUrlBase = targetUrlBase.replace(/\/+$/, '');
+
       if (!row || !Array.isArray(row)) {
-        var sampleUrl = targetUrlBase + (targetUrlBase.indexOf('?') > -1 ? '&' : '?') +
-          'v=1' +
-          '&c=' + encodeURIComponent('CAUSTIC SODA 50%') +
-          '&m=' + encodeURIComponent('Mode Weight') +
-          '&t=200.00' +
-          '&a=200.30' +
-          '&d=' + encodeURIComponent('+0.30 kg (+0.15%)') +
-          '&dt=' + encodeURIComponent('26/11/2026 10:14:34') +
-          '&st=pass';
+        var sampleUrl = targetUrlBase + '/?v=1&c=1&m=W&t=200&a=200.3&d=26/11 10:14';
         return {
           chemical: 'CAUSTIC SODA 50%',
           mode: 'MODE WEIGHT',
@@ -1625,8 +1677,8 @@
       var targetNum = parseCleanNum(row[1]);
       var actualNum = getEffectiveActualWeight(row[3], row[2]);
 
-      var targetStr = !isNaN(targetNum) ? targetNum.toFixed(2) : String(row[1] || '-');
-      var actualStr = !isNaN(actualNum) ? actualNum.toFixed(2) : String(row[3] || row[2] || '-');
+      var targetStr = !isNaN(targetNum) ? (Number.isInteger(targetNum) ? String(targetNum) : targetNum.toFixed(2)) : String(row[1] || '-');
+      var actualStr = !isNaN(actualNum) ? (Number.isInteger(actualNum) ? String(actualNum) : actualNum.toFixed(2)) : String(row[3] || row[2] || '-');
 
       var diffStr = '-';
       var isNormal = true;
@@ -1638,23 +1690,40 @@
         diffStr = sign + diff.toFixed(2) + ' kg (' + (diff > 0 ? '+' : '') + diffPct.toFixed(1) + '%)';
       }
 
-      // สร้างลิงก์ QR Code ที่เมื่อสแกนด้วยกล้องมือถือ จะเปิดหน้าเว็บพร้อมเด้งป๊อปอัปตรวจสอบข้อมูลทันที
-      var sep = targetUrlBase.indexOf('?') > -1 ? '&' : '?';
-      var qrPayload = targetUrlBase + sep +
-        'v=1' +
-        '&c=' + encodeURIComponent(scaleInfo.chemical || 'CHEMICAL') +
-        '&m=' + encodeURIComponent(scaleInfo.mode || 'Mode Weight') +
+      // ย่อรหัสเคมี: 1=CAUSTIC, 2=LAS, 3=LS9, 4=UD1 เพื่อให้ URL สั้นที่สุด จุด QR Code จะเม็ดใหญ่มาก สแกนง่าย 100%
+      var chemCode = '1';
+      var chemUpper = String(scaleInfo.chemical || '').toUpperCase();
+      if (chemUpper.indexOf('CAUSTIC') > -1 || chemUpper.indexOf('NAOH') > -1) chemCode = '1';
+      else if (chemUpper.indexOf('LAS') > -1) chemCode = '2';
+      else if (chemUpper.indexOf('LS9') > -1) chemCode = '3';
+      else if (chemUpper.indexOf('UD1') > -1) chemCode = '4';
+      else chemCode = scaleInfo.chemical;
+
+      var modeCode = (scaleInfo.mode === 'Mode Timer') ? 'T' : 'W';
+
+      // วันที่เวลาสั้น เช่น 26/11 13:40
+      var shortDate = dateStr;
+      if (dateObj) {
+        var dDay = String(dateObj.getDate()).padStart(2, '0');
+        var dMo = String(dateObj.getMonth() + 1).padStart(2, '0');
+        var dHr = String(dateObj.getHours()).padStart(2, '0');
+        var dMin = String(dateObj.getMinutes()).padStart(2, '0');
+        shortDate = dDay + '/' + dMo + ' ' + dHr + ':' + dMin;
+      }
+
+      // URL สั้นพิเศษ (~55 ตัวอักษร) ทำให้ QR Code เม็ดใหญ่ ไม่ถี่ ไม่เบลอติดกัน
+      var qrPayload = targetUrlBase + '/?v=1' +
+        '&c=' + encodeURIComponent(chemCode) +
+        '&m=' + modeCode +
         '&t=' + encodeURIComponent(targetStr) +
         '&a=' + encodeURIComponent(actualStr) +
-        '&d=' + encodeURIComponent(diffStr) +
-        '&dt=' + encodeURIComponent(dateStr) +
-        '&st=' + (isNormal ? 'pass' : 'alert');
+        '&d=' + encodeURIComponent(shortDate);
 
       return {
         chemical: scaleInfo.chemical || 'CHEMICAL',
         mode: (scaleInfo.mode || 'MODE WEIGHT').toUpperCase(),
-        targetStr: targetStr,
-        actualStr: actualStr,
+        targetStr: !isNaN(targetNum) ? targetNum.toFixed(2) : targetStr,
+        actualStr: !isNaN(actualNum) ? actualNum.toFixed(2) : actualStr,
         diffStr: diffStr,
         isNormal: isNormal,
         dateStr: dateStr,
@@ -1678,11 +1747,11 @@
         try {
           new QRCode(qrContainer, {
             text: data.qrPayload,
-            width: 66,
-            height: 66,
+            width: 85,
+            height: 85,
             colorDark: '#000000',
             colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.M
+            correctLevel: QRCode.CorrectLevel.L
           });
         } catch (e) {
           qrContainer.innerHTML = '<small style="font-size:8px;">QR</small>';
@@ -1707,11 +1776,11 @@
         try {
           new QRCode(qrContainer, {
             text: data.qrPayload,
-            width: 72,
-            height: 72,
+            width: 85,
+            height: 85,
             colorDark: '#000000',
             colorLight: '#ffffff',
-            correctLevel: QRCode.CorrectLevel.M
+            correctLevel: QRCode.CorrectLevel.L
           });
         } catch (e) {
           qrContainer.innerHTML = '<span style="font-size:9px; font-weight:bold;">[QR CODE]</span>';
@@ -1874,6 +1943,7 @@
     }
 
     // ระบบรีเฟรชข้อมูลอัตโนมัติ (SCADA Auto-Sync)
+    let tankRefreshCounter = 0;
     function toggleAutoRefresh(seconds) {
       if (autoRefreshTimer) {
         clearInterval(autoRefreshTimer);
@@ -1882,8 +1952,13 @@
       var sec = parseInt(seconds, 10);
       if (sec > 0) {
         autoRefreshTimer = setInterval(function() {
-          loadData(true); // รีเฟรชข้อมูลระบบแบ่งจ่ายแบบเงียบ
-          loadTankData(true); // รีเฟรชข้อมูลระดับแท็งก์สารเคมีแบบเงียบ
+          loadData(true); // รีเฟรชข้อมูลระบบแบ่งจ่ายทันที
+          tankRefreshCounter++;
+          // ข้อมูลแท็งก์รีเฟรชทุกๆ 15 วินาทีก็เพียงพอ ไม่ต้องยิงทุก 1 วินาที
+          if (sec >= 15 || (tankRefreshCounter * sec >= 15)) {
+            tankRefreshCounter = 0;
+            loadTankData(true);
+          }
         }, sec * 1000);
       }
     }
@@ -2046,7 +2121,7 @@
         var parsedRows = parseInfluxDosingCsv(csvData);
         if (parsedRows && parsedRows.length > 1) {
           updateDataSourceBadge('influx');
-          onSuccess({ rows: parsedRows, tolerancePercent: currentTolerancePercent });
+          onSuccess({ rows: parsedRows, tolerancePercent: currentTolerancePercent }, isSilent);
           return;
         }
       } catch (influxErr) {
@@ -2055,10 +2130,10 @@
 
       // 2. หาก InfluxDB ไม่พร้อม ให้ดึงจาก Google Sheets (Fallback)
       updateDataSourceBadge('sheets');
-      loadDataFromGoogleSheets();
+      loadDataFromGoogleSheets(isSilent);
     }
 
-    function loadDataFromGoogleSheets() {
+    function loadDataFromGoogleSheets(isSilent) {
       var url = getWebAppUrl();
       fetch(url)
         .then(function(res) {
@@ -2066,14 +2141,14 @@
           return res.json();
         })
         .then(function(data) {
-          onSuccess(data);
+          onSuccess(data, isSilent);
         })
         .catch(function(err) {
-          fetchJsonpFallback(url, err);
+          fetchJsonpFallback(url, err, isSilent);
         });
     }
 
-    function fetchJsonpFallback(url, originalError) {
+    function fetchJsonpFallback(url, originalError, isSilent) {
       var callbackName = 'gasCallback_' + Math.round(100000 * Math.random());
       var script = document.createElement('script');
       var sep = url.indexOf('?') > -1 ? '&' : '?';
@@ -2087,7 +2162,7 @@
       window[callbackName] = function(data) {
         clearTimeout(timer);
         cleanup();
-        onSuccess(data);
+        onSuccess(data, isSilent);
       };
 
       function cleanup() {
@@ -2104,7 +2179,10 @@
       document.body.appendChild(script);
     }
 
-    function onSuccess(data) {
+    // ตัวแปรจดจำ Signature ข้อมูลล่าสุด เพื่อป้องกันการวาด DOM และกราฟใหม่โดยไม่จำเป็น (แก้ปัญหากราฟกระพริบ 100%)
+    var lastDosingDataSignature = "";
+
+    function onSuccess(data, isSilent) {
       document.getElementById('comm-status').innerText = 'ออนไลน์';
       document.getElementById('comm-status').className = 'text-success';
       document.getElementById('last-update-time').innerText = 'อัปเดต: ' + new Date().toLocaleTimeString('th-TH');
@@ -2127,7 +2205,22 @@
         return;
       }
 
-      rawData = rows.slice(1);
+      var newRawData = rows.slice(1);
+
+      // ตรวจสอบและสั่งพิมพ์สติ๊กเกอร์อัตโนมัติหากมีข้อมูลใหม่ (Auto-Print Zebra ZD421)
+      checkAutoPrint(newRawData);
+
+      // สร้าง Data Signature เช็คว่ามีข้อมูลแถวใหม่เข้ามาหรือไม่
+      var latestRow = newRawData[newRawData.length - 1];
+      var currentSig = newRawData.length + '|' + (latestRow ? (String(latestRow[0]) + '|' + String(latestRow[3])) : '');
+
+      // หากเป็นการรีเฟรชเงียบ (เช่น โหมดอัตโนมัติ 1 วินาที) และข้อมูลชุดเดิมไม่เปลี่ยนแปลงเลย
+      // ให้ออกจากการทำงานทันที ไม่ต้องทำลาย DOM หรือวาดกราฟใหม่ซ้ำๆ ทำให้กราฟนิ่งสนิท ไม่กระพริบ 100%!
+      if (isSilent && currentSig === lastDosingDataSignature) {
+        return;
+      }
+      lastDosingDataSignature = currentSig;
+      rawData = newRawData;
 
       // สร้างการ์ดแสดงการใช้งานล่าสุดของแต่ละตาชั่ง (SCADA Mimic Cards)
       renderLatestCards(rawData);
@@ -2136,10 +2229,7 @@
       buildFilterDropdowns(rawData);
 
       // คำนวณสรุปข้อมูล, กราฟ, และตาราง
-      filterData();
-
-      // ตรวจสอบและสั่งพิมพ์สติ๊กเกอร์อัตโนมัติหากมีข้อมูลใหม่ (Auto-Print Zebra ZD421)
-      checkAutoPrint(rawData);
+      filterData(isSilent);
     }
 
     function onError(error) {
@@ -2310,7 +2400,7 @@
       }
     }
 
-    function filterData() {
+    function filterData(isSilent) {
       if (!rawData || rawData.length === 0) return;
 
       var startStr = document.getElementById('start-date').value;
@@ -2352,12 +2442,12 @@
         return true;
       });
 
-      renderSummaryTableAndCharts(filtered, selectedMode, selectedChemical);
+      renderSummaryTableAndCharts(filtered, selectedMode, selectedChemical, isSilent);
       renderDetailTable(filtered);
     }
 
     // สรุปยอดและวาดกราฟ SCADA ทั้ง 2 ตัว
-    function renderSummaryTableAndCharts(rows, selectedMode, selectedChemical) {
+    function renderSummaryTableAndCharts(rows, selectedMode, selectedChemical, isSilent) {
       var tbody = document.querySelector('#summary-table tbody');
       var chemMap = {};
 
@@ -2441,8 +2531,8 @@
       renderChemicalUsageCards(chemMap, grandBatches, grandTarget, grandActual);
 
       // วาดกราฟ
-      renderBarChart(chemMap);
-      renderTrendChart(rows);
+      renderBarChart(chemMap, isSilent);
+      renderTrendChart(rows, isSilent);
     }
 
     // ฟังก์ชันสร้างการ์ดสรุปยอดการใช้งานสารเคมีแต่ละตัวตามช่วงเวลา
@@ -2579,7 +2669,7 @@
     }
 
     // กราฟแท่ง ปริมาณเคมีรวมแต่ละตัว
-    function renderBarChart(chemMap) {
+    function renderBarChart(chemMap, isSilent) {
       var ctx = document.getElementById('barChart').getContext('2d');
       var labels = [];
       var actualData = [];
@@ -2591,7 +2681,15 @@
         targetData.push(chemMap[k].targetTotal);
       });
 
-      if (barChartInstance) barChartInstance.destroy();
+      // หากมีอินสแตนซ์ของกราฟเดิมอยู่แล้ว ให้อัปเดตข้อมูลชุดเดิมใน canvas ทันที
+      // โดยไม่ทำลาย (destroy) และไม่เล่น animation ซ้ำ ทำให้กราฟนิ่งสนิท 100% ไม่กระพริบแม้รีเฟรชทุก 1 วินาที!
+      if (barChartInstance) {
+        barChartInstance.data.labels = labels;
+        barChartInstance.data.datasets[0].data = actualData;
+        barChartInstance.data.datasets[1].data = targetData;
+        barChartInstance.update('none');
+        return;
+      }
 
       barChartInstance = new Chart(ctx, {
         type: 'bar',
@@ -2613,6 +2711,7 @@
           ]
         },
         options: {
+          animation: false, // ปิด animation เพื่อการแสดงผลแบบเรียลไทม์ที่นิ่งสนิท ไม่กระพริบ
           responsive: true,
           maintainAspectRatio: false,
           plugins: {
@@ -2639,7 +2738,7 @@
     }
 
     // กราฟเส้น SCADA Process Trend
-    function renderTrendChart(rows) {
+    function renderTrendChart(rows, isSilent) {
       var ctx = document.getElementById('trendChart').getContext('2d');
       // แสดงตัวอย่าง 40 รายการล่าสุด
       var sample = rows.slice(-40);
@@ -2654,7 +2753,15 @@
         actualData.push(getEffectiveActualWeight(r[3], r[2]));
       });
 
-      if (trendChartInstance) trendChartInstance.destroy();
+      // หากมีกราฟเส้นเดิมอยู่แล้ว ให้อัปเดต datasets โดยตรง ไม่ทำลาย canvas
+      // ทำให้เส้นกราฟเคลื่อนไหวได้อย่างสมูท ไม่กะพริบตา
+      if (trendChartInstance) {
+        trendChartInstance.data.labels = labels;
+        trendChartInstance.data.datasets[0].data = targetData;
+        trendChartInstance.data.datasets[1].data = actualData;
+        trendChartInstance.update('none');
+        return;
+      }
 
       trendChartInstance = new Chart(ctx, {
         type: 'line',
@@ -2690,6 +2797,7 @@
           ]
         },
         options: {
+          animation: false, // ปิด animation เพื่อความนิ่งสมบูรณ์แบบ
           responsive: true,
           maintainAspectRatio: false,
           interaction: { mode: 'index', intersect: false },
