@@ -12,6 +12,8 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <!-- โหลด SheetJS สำหรับส่งออกข้อมูลเป็น Excel (.xlsx) -->
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <!-- โหลด QRCode.js สำหรับสร้าง QR Code บนสติ๊กเกอร์ลาเบล 7x4 cm ของ Zebra ZD421 -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 
   <style>
     /* ใช้ฟอนต์เดิมที่อ่านง่าย คมชัด มาตรฐานระบบ (Segoe UI / Tahoma) ไม่ใช้ฟอนต์แปลกตา */
@@ -499,6 +501,65 @@
       font-variant-numeric: tabular-nums;
       color: #f8fafc;
     }
+
+    /* ---------------------------------------------------- */
+    /* สไตล์สำหรับการพิมพ์ฉลาก Zebra ZD421 (70mm x 40mm)   */
+    /* ---------------------------------------------------- */
+    @media print {
+      @page {
+        size: 70mm 40mm;
+        margin: 0;
+      }
+      html, body {
+        width: 70mm !important;
+        height: 40mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        overflow: hidden !important;
+      }
+      body * {
+        visibility: hidden !important;
+      }
+      #zebra-print-area, #zebra-print-area * {
+        visibility: visible !important;
+      }
+      #zebra-print-area {
+        display: block !important;
+        position: fixed !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 70mm !important;
+        height: 40mm !important;
+        margin: 0 !important;
+        padding: 1.5mm 2.2mm !important;
+        box-sizing: border-box !important;
+        background: #ffffff !important;
+        color: #000000 !important;
+        font-family: Arial, Tahoma, -apple-system, sans-serif !important;
+      }
+    }
+
+    #zebra-print-area {
+      display: none;
+    }
+
+    /* สไตล์พรีวิวฉลากในหน้าจอ Modal */
+    .label-preview-card {
+      width: 320px;
+      height: 183px; /* อัตราส่วน 70mm x 40mm */
+      background: #ffffff;
+      color: #000000;
+      border: 2px solid #38bdf8;
+      border-radius: 6px;
+      padding: 8px 10px;
+      box-sizing: border-box;
+      font-family: Arial, Tahoma, sans-serif;
+      margin: 0 auto;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+      position: relative;
+    }
   </style>
 </head>
 <body>
@@ -530,6 +591,9 @@
           </div>
           <button class="btn btn-sm btn-outline-info fw-semibold d-flex align-items-center gap-1" onclick="openToleranceModal()" title="คลิกเพื่อปรับเกณฑ์ % ผลต่าง (ซิงค์ใช้ร่วมกันทุกคน)">
             <i class="bi bi-sliders"></i> เกณฑ์ Diff: <span id="current-tolerance-badge" class="badge bg-warning text-dark fw-bold">±1.0%</span>
+          </button>
+          <button class="btn btn-sm btn-outline-warning fw-semibold d-flex align-items-center gap-1" onclick="openLabelPrinterModal()" title="ตั้งค่าระบบพิมพ์ฉลากสติ๊กเกอร์ Zebra ZD421 (7cm × 4cm)">
+            <i class="bi bi-printer-fill text-warning"></i> ลาเบล 7x4cm: <span id="auto-print-badge" class="badge bg-secondary">ปิดออโต้</span>
           </button>
           <div class="d-flex align-items-center gap-1 px-2 py-1 rounded bg-dark border border-secondary">
             <label for="auto-refresh-select" class="small fw-semibold text-light mb-0" style="font-size: 13px;"><i class="bi bi-stopwatch text-info me-1"></i>ออโต้:</label>
@@ -740,11 +804,12 @@
               <th style="width: 130px;">Actual (kg)</th>
               <th style="width: 130px;">ผลต่าง (Diff)</th>
               <th style="width: 145px;">สถานะ</th>
+              <th style="width: 85px;">พิมพ์</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td colspan="8" class="text-center py-4 text-light">กำลังซิงค์ข้อมูลระบบ (Synchronizing System Data)...</td>
+              <td colspan="9" class="text-center py-4 text-light">กำลังซิงค์ข้อมูลระบบ (Synchronizing System Data)...</td>
             </tr>
           </tbody>
         </table>
@@ -1080,6 +1145,154 @@
     </div>
   </div>
 
+  <!-- Modal สำหรับระบบพิมพ์ฉลากสติ๊กเกอร์ Zebra ZD421 (7cm × 4cm) -->
+  <div class="modal fade" id="labelPrinterModal" tabindex="-1" aria-labelledby="labelPrinterModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content bg-dark text-white border border-secondary shadow-lg">
+        <div class="modal-header border-secondary">
+          <h5 class="modal-title fs-6 fw-bold text-warning" id="labelPrinterModalLabel">
+            <i class="bi bi-printer-fill me-2"></i>ระบบพิมพ์ฉลากสติ๊กเกอร์ Zebra ZD421 (ขนาด 7cm × 4cm)
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          
+          <!-- สวิตช์เปิด/ปิด Auto-Print -->
+          <div class="p-3 bg-black bg-opacity-50 rounded border border-warning mb-3 d-flex justify-content-between align-items-center">
+            <div>
+              <label class="form-check-label fw-bold text-white fs-6 d-block" for="switch-auto-print">
+                <i class="bi bi-magic text-warning me-1"></i> พิมพ์ฉลากอัตโนมัติเมื่อมีน้ำหนักเข้ามาใหม่ (Auto-Print)
+              </label>
+              <span class="small text-light">เมื่อระบบตรวจพบข้อมูลการแบ่งถ่ายรอบใหม่ จะสั่งเครื่องพิมพ์ Zebra ZD421 ดึงสติ๊กเกอร์ออกมาให้ทันที</span>
+            </div>
+            <div class="form-check form-switch m-0">
+              <input class="form-check-input fs-3 ms-2" type="checkbox" role="switch" id="switch-auto-print" onchange="toggleAutoPrintSetting(this.checked)" style="cursor: pointer;">
+            </div>
+          </div>
+
+          <div class="row g-3">
+            <!-- คอลัมน์ซ้าย: พรีวิวฉลากขนาด 7cm x 4cm -->
+            <div class="col-md-6 text-center">
+              <div class="small fw-semibold text-info mb-2"><i class="bi bi-eye me-1"></i>พรีวิวตัวอย่างสติ๊กเกอร์จริง (70 mm × 40 mm)</div>
+              
+              <div class="label-preview-card text-start d-flex flex-column justify-content-between" id="modal-label-preview">
+                <div style="border-bottom: 1.5px solid #000; padding-bottom: 2px; display: flex; justify-content: space-between; align-items: center;">
+                  <span style="font-size: 8.5px; font-weight: 900; letter-spacing: 0.5px;">PP FACTORY - CHEMICAL DISPENSING</span>
+                  <span style="font-size: 8px; font-weight: bold; background: #000; color: #fff; padding: 0 4px; border-radius: 2px;" id="prev-mode">MODE WEIGHT</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin: 3px 0;">
+                  <div style="flex: 1; padding-right: 4px;">
+                    <div style="font-size: 13px; font-weight: 900; line-height: 1.1; margin-bottom: 3px;" id="prev-chemical">
+                      CAUSTIC SODA 50%
+                    </div>
+                    <div style="font-size: 9px; margin-bottom: 2px;">
+                      <span>Target: <b id="prev-target" style="font-size: 10.5px;">200.00</b> kg</span><br>
+                      <span>Actual: <b id="prev-actual" style="font-size: 13px; font-weight: 900; color: #000;">200.30</b> kg</span>
+                    </div>
+                    <div style="font-size: 8.5px; font-weight: bold;" id="prev-diff-row">
+                      Diff: <span id="prev-diff">+0.30 kg (+0.15%)</span>
+                    </div>
+                  </div>
+                  <div style="width: 72px; height: 72px; display: flex; align-items: center; justify-content: center; background: #fff; border: 1px solid #ccc; border-radius: 4px; padding: 2px;">
+                    <div id="prev-qrcode" style="width: 66px; height: 66px;"></div>
+                  </div>
+                </div>
+                <div style="border-top: 1px dashed #000; padding-top: 2px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 8px;">
+                  <div>
+                    <span>วัน-เวลา: </span><b id="prev-datetime">26/11/2026 10:14:34</b>
+                  </div>
+                  <div>
+                    <span>ผู้แบ่งถ่าย: </span><span style="display: inline-block; width: 60px; border-bottom: 1px solid #000;">&nbsp;</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="mt-3 d-flex gap-2 justify-content-center">
+                <button type="button" class="btn btn-sm btn-warning fw-bold px-3 shadow" onclick="testPrintLabel()">
+                  <i class="bi bi-printer-fill me-1"></i> ทดสอบพิมพ์ใบนี้ (Test Print 7x4cm)
+                </button>
+              </div>
+            </div>
+
+            <!-- คอลัมน์ขวา: คำแนะนำการตั้งค่า Zebra และ Silent Print -->
+            <div class="col-md-6">
+              <div class="p-3 bg-black bg-opacity-40 rounded border border-secondary h-100 text-light small">
+                <h6 class="fw-bold text-info fs-6 mb-2"><i class="bi bi-gear-fill me-1"></i>วิธีตั้งค่าเครื่องพิมพ์ Zebra ZD421:</h6>
+                <ol class="ps-3 mb-3" style="line-height: 1.6;">
+                  <li>ใน Windows ให้เปิด <b>Printers & Scanners</b> &gt; เลือก <b>Zebra ZD421</b> &gt; <b>Printing Preferences</b></li>
+                  <li>ตั้งค่าขนาดกระดาษ (Stocks) เป็น <b>กว้าง 70 mm, สูง 40 mm</b></li>
+                  <li>ตั้งค่าการพิมพ์เป็น <b>Direct Thermal</b> หรือ <b>Thermal Transfer</b> ตามม้วนสติ๊กเกอร์ที่ใช้</li>
+                </ol>
+
+                <h6 class="fw-bold text-warning fs-6 mb-2"><i class="bi bi-lightning-charge-fill me-1"></i>เทคนิคพิมพ์ทันทีโดยไม่ต้องกดยืนยัน (Silent Print):</h6>
+                <p class="mb-2" style="line-height: 1.5;">
+                  หากต้องการให้เครื่องพิมพ์สติ๊กเกอร์ออกมาทันที <b>0 คลิก</b> โดยไม่มีหน้าต่าง Print Preview เด้งขึ้นมา:
+                </p>
+                <div class="p-2 bg-dark rounded border border-secondary text-warning font-monospace" style="font-size: 11.5px;">
+                  --kiosk-printing
+                </div>
+                <div class="text-light mt-1" style="font-size: 11px;">
+                  *นำคำสั่งนี้ไปใส่ที่ท้ายช่อง <b>Target</b> ของไอคอนทางลัด Chrome หรือ Edge แล้วเปิดหน้าเว็บนี้ไว้ เครื่องจะยิงฉลากออกทันทีเมื่อมีรายการใหม่!
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+        <div class="modal-footer border-secondary">
+          <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">ปิดหน้าต่าง</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- DOM Container สำหรับพิมพ์ฉลาก 70mm x 40mm ออกเครื่องพิมพ์ Zebra ZD421 โดยเฉพาะ -->
+  <div id="zebra-print-area">
+    <div style="border: 1.5px solid #000; height: 100%; border-radius: 3px; padding: 1.2mm 2mm; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; position: relative;">
+      
+      <!-- หัวฉลาก -->
+      <div style="border-bottom: 1.2px solid #000; padding-bottom: 1px; display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 8.5px; font-weight: 900; letter-spacing: 0.5px;">PP FACTORY - CHEMICAL DISPENSING</span>
+        <span style="font-size: 8px; font-weight: bold; background: #000; color: #fff; padding: 0 4px; border-radius: 2px;" id="lbl-mode">MODE WEIGHT</span>
+      </div>
+
+      <!-- ส่วนกลาง: ชื่อสารเคมี + ข้อมูลน้ำหนัก & QR Code -->
+      <div style="display: flex; justify-content: space-between; align-items: center; margin: 1px 0;">
+        <div style="flex: 1; padding-right: 3px;">
+          <!-- ชื่อสารเคมี -->
+          <div style="font-size: 12px; font-weight: 900; line-height: 1.1; margin-bottom: 2px; color: #000;" id="lbl-chemical">
+            CAUSTIC SODA 50%
+          </div>
+          <!-- น้ำหนัก Target & Actual -->
+          <div style="font-size: 8.5px; margin-bottom: 1px;">
+            <span>Target: <b id="lbl-target" style="font-size: 9.5px;">200.00</b> kg</span><br>
+            <span>Actual: <b id="lbl-actual" style="font-size: 12px; font-weight: 900;">200.30</b> kg</span>
+          </div>
+          <!-- Diff & ผลการยอมรับ -->
+          <div style="font-size: 8px; font-weight: bold;" id="lbl-diff-row">
+            Diff: <span id="lbl-diff">+0.30 kg (+0.15%)</span>
+          </div>
+        </div>
+
+        <!-- กล่อง QR Code ด้านขวา -->
+        <div style="width: 22mm; height: 22mm; display: flex; align-items: center; justify-content: center; background: #fff;">
+          <div id="lbl-qrcode" style="width: 20mm; height: 20mm;"></div>
+        </div>
+      </div>
+
+      <!-- แถวล่างสุด: วันที่เวลา และ ช่องเซ็นชื่อ -->
+      <div style="border-top: 1px dashed #000; padding-top: 1px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 7.5px;">
+        <div>
+          <span>วัน-เวลา: </span><b id="lbl-datetime">26/11/2026 10:14:34</b>
+        </div>
+        <div>
+          <span>ผู้แบ่งถ่าย: </span><span style="display: inline-block; width: 20mm; border-bottom: 0.8px solid #000;">&nbsp;</span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- โหลด Bootstrap 5 JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -1171,6 +1384,7 @@
 
     window.onload = function() {
       startLiveClock();
+      initAutoPrintUI();
       loadData(false);
       
       // ตั้งค่าตัวกรองประวัติแท็งก์เริ่มต้นเป็น 7 วันล่าสุด และโหลดข้อมูลแท็งก์ล่วงหน้า
@@ -1199,6 +1413,221 @@
       if (badge) badge.innerText = '±' + Number(val).toFixed(1) + '%';
       var input = document.getElementById('input-tolerance');
       if (input && document.activeElement !== input) input.value = Number(val).toFixed(1);
+    }
+
+    // =========================================================================
+    // ระบบพิมพ์ฉลากสติ๊กเกอร์ Zebra ZD421 (ขนาด 7cm x 4cm / 70mm x 40mm)
+    // =========================================================================
+    var isAutoPrintEnabled = localStorage.getItem('zebraAutoPrintEnabled') === 'true';
+    var lastPrintedTimestamp = localStorage.getItem('zebraLastPrintedTimestamp') || '';
+
+    // อัปเดตสถานะสวิตช์และป้ายแสดงสถานะ Auto-Print
+    function initAutoPrintUI() {
+      var badge = document.getElementById('auto-print-badge');
+      var sw = document.getElementById('switch-auto-print');
+      if (badge) {
+        if (isAutoPrintEnabled) {
+          badge.className = 'badge bg-success';
+          badge.innerText = 'เปิดออโต้';
+        } else {
+          badge.className = 'badge bg-secondary';
+          badge.innerText = 'ปิดออโต้';
+        }
+      }
+      if (sw) {
+        sw.checked = isAutoPrintEnabled;
+      }
+    }
+
+    function toggleAutoPrintSetting(checked) {
+      isAutoPrintEnabled = !!checked;
+      localStorage.setItem('zebraAutoPrintEnabled', String(isAutoPrintEnabled));
+      initAutoPrintUI();
+
+      // หากเพิ่งเปิดใช้งาน ให้บันทึกแถวล่าสุดปัจจุบันไว้เป็นจุดเริ่มต้น จะได้ไม่ย้อนไปปริ้นประวัติเก่า
+      if (isAutoPrintEnabled && rawData && rawData.length > 0) {
+        var latest = rawData[rawData.length - 1];
+        lastPrintedTimestamp = String(latest[0] || '');
+        localStorage.setItem('zebraLastPrintedTimestamp', lastPrintedTimestamp);
+      }
+    }
+
+    // เปิดหน้าต่าง Modal ตั้งค่าและพรีวิวฉลาก
+    function openLabelPrinterModal() {
+      initAutoPrintUI();
+      var recordToPreview = (rawData && rawData.length > 0) ? rawData[rawData.length - 1] : null;
+      renderLabelPreview(recordToPreview);
+
+      var modalEl = document.getElementById('labelPrinterModal');
+      var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+      modal.show();
+    }
+
+    // ฟังก์ชันจัดรูปแบบข้อมูลสำหรับฉลาก
+    function extractLabelData(row) {
+      if (!row || !Array.isArray(row)) {
+        return {
+          chemical: 'CAUSTIC SODA 50%',
+          mode: 'MODE WEIGHT',
+          targetStr: '200.00',
+          actualStr: '200.30',
+          diffStr: '+0.30 kg (+0.15%)',
+          isNormal: true,
+          dateStr: '26/11/2026 10:14:34',
+          qrPayload: 'PP_FACTORY|CAUSTIC SODA 50%|200.00|200.30|26/11/2026 10:14:34'
+        };
+      }
+
+      var dateObj = parseDateSafe(row[0]);
+      var dateStr = dateObj ? formatDateTime(dateObj) : String(row[0] || '-');
+      var scaleInfo = parseScaleInfo(row[4]);
+      var targetNum = parseCleanNum(row[1]);
+      var actualNum = getEffectiveActualWeight(row[3], row[2]);
+
+      var targetStr = !isNaN(targetNum) ? targetNum.toFixed(2) : String(row[1] || '-');
+      var actualStr = !isNaN(actualNum) ? actualNum.toFixed(2) : String(row[3] || row[2] || '-');
+
+      var diffStr = '-';
+      var isNormal = true;
+      if (!isNaN(targetNum) && !isNaN(actualNum)) {
+        var diff = actualNum - targetNum;
+        var diffPct = targetNum > 0 ? (Math.abs(diff) / targetNum) * 100 : 0;
+        isNormal = targetNum > 0 ? (diffPct <= currentTolerancePercent) : (Math.abs(diff) <= 0.5);
+        var sign = diff > 0 ? '+' : '';
+        diffStr = sign + diff.toFixed(2) + ' kg (' + (diff > 0 ? '+' : '') + diffPct.toFixed(1) + '%)';
+      }
+
+      var qrPayload = 'PP_CHEM|' + scaleInfo.chemical + '|' + scaleInfo.mode + '|T:' + targetStr + '|A:' + actualStr + '|' + dateStr;
+
+      return {
+        chemical: scaleInfo.chemical || 'CHEMICAL',
+        mode: (scaleInfo.mode || 'MODE WEIGHT').toUpperCase(),
+        targetStr: targetStr,
+        actualStr: actualStr,
+        diffStr: diffStr,
+        isNormal: isNormal,
+        dateStr: dateStr,
+        qrPayload: qrPayload
+      };
+    }
+
+    // วาดพรีวิวฉลากใน Modal
+    function renderLabelPreview(row) {
+      var data = extractLabelData(row);
+      document.getElementById('prev-mode').innerText = data.mode;
+      document.getElementById('prev-chemical').innerText = data.chemical;
+      document.getElementById('prev-target').innerText = data.targetStr;
+      document.getElementById('prev-actual').innerText = data.actualStr;
+      document.getElementById('prev-diff').innerText = data.diffStr;
+      document.getElementById('prev-datetime').innerText = data.dateStr;
+
+      var qrContainer = document.getElementById('prev-qrcode');
+      qrContainer.innerHTML = '';
+      if (typeof QRCode !== 'undefined') {
+        try {
+          new QRCode(qrContainer, {
+            text: data.qrPayload,
+            width: 66,
+            height: 66,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+          });
+        } catch (e) {
+          qrContainer.innerHTML = '<small style="font-size:8px;">QR</small>';
+        }
+      } else {
+        qrContainer.innerHTML = '<small style="font-size:8px;">[QR CODE]</small>';
+      }
+    }
+
+    // เติมข้อมูลลงใน DOM Container สำหรับพิมพ์ (#zebra-print-area)
+    function populatePrintArea(data) {
+      document.getElementById('lbl-mode').innerText = data.mode;
+      document.getElementById('lbl-chemical').innerText = data.chemical;
+      document.getElementById('lbl-target').innerText = data.targetStr;
+      document.getElementById('lbl-actual').innerText = data.actualStr;
+      document.getElementById('lbl-diff').innerText = data.diffStr;
+      document.getElementById('lbl-datetime').innerText = data.dateStr;
+
+      var qrContainer = document.getElementById('lbl-qrcode');
+      qrContainer.innerHTML = '';
+      if (typeof QRCode !== 'undefined') {
+        try {
+          new QRCode(qrContainer, {
+            text: data.qrPayload,
+            width: 72,
+            height: 72,
+            colorDark: '#000000',
+            colorLight: '#ffffff',
+            correctLevel: QRCode.CorrectLevel.M
+          });
+        } catch (e) {
+          qrContainer.innerHTML = '<span style="font-size:9px; font-weight:bold;">[QR CODE]</span>';
+        }
+      } else {
+        qrContainer.innerHTML = '<span style="font-size:9px; font-weight:bold;">[QR CODE]</span>';
+      }
+    }
+
+    // ฟังก์ชันสั่งพิมพ์สติ๊กเกอร์ (เรียก window.print())
+    function executePrint(data) {
+      populatePrintArea(data);
+      // หน่วงเวลาเล็กน้อยให้ QR Code เรนเดอร์เสร็จสมบูรณ์
+      setTimeout(function() {
+        window.print();
+      }, 150);
+    }
+
+    // กดปุ่มพิมพ์จากแถวในตารางประวัติ (Re-print)
+    function printRowLabelByIndex(index) {
+      if (!currentDetailRows || index < 0 || index >= currentDetailRows.length) {
+        alert('ไม่พบข้อมูลรายการที่เลือก');
+        return;
+      }
+      var row = currentDetailRows[index];
+      var data = extractLabelData(row);
+      executePrint(data);
+    }
+
+    // กดปุ่มทดสอบพิมพ์จาก Modal
+    function testPrintLabel() {
+      var recordToPreview = (rawData && rawData.length > 0) ? rawData[rawData.length - 1] : null;
+      var data = extractLabelData(recordToPreview);
+      executePrint(data);
+    }
+
+    // ตรวจสอบและสั่งพิมพ์อัตโนมัติเมื่อมีข้อมูลใหม่เข้ามา (Auto-Print Engine)
+    function checkAutoPrint(allRows) {
+      if (!allRows || allRows.length === 0) return;
+
+      var latestRow = allRows[allRows.length - 1];
+      var latestTimestamp = String(latestRow[0] || '');
+      if (!latestTimestamp) return;
+
+      // ถ้ายังไม่เคยบันทึกค่าไว้ (เปิดเว็บครั้งแรก) ให้จดจำแถวล่าสุดไว้ก่อน ไม่ต้องปริ้นย้อนหลัง
+      if (!lastPrintedTimestamp) {
+        lastPrintedTimestamp = latestTimestamp;
+        localStorage.setItem('zebraLastPrintedTimestamp', lastPrintedTimestamp);
+        return;
+      }
+
+      // หากมีแถวใหม่ที่เวลาก้าวหน้ากว่าแถวที่เคยบันทึก
+      if (latestTimestamp !== lastPrintedTimestamp) {
+        var prevTime = new Date(lastPrintedTimestamp).getTime();
+        var newTime = new Date(latestTimestamp).getTime();
+
+        if (isNaN(prevTime) || isNaN(newTime) || newTime > prevTime) {
+          lastPrintedTimestamp = latestTimestamp;
+          localStorage.setItem('zebraLastPrintedTimestamp', lastPrintedTimestamp);
+
+          if (isAutoPrintEnabled) {
+            console.log('Zebra ZD421 Auto-Printing new record:', latestRow);
+            var data = extractLabelData(latestRow);
+            executePrint(data);
+          }
+        }
+      }
     }
 
     // เปิดหน้าต่าง Modal ตั้งค่าเกณฑ์ %
@@ -1431,7 +1860,7 @@
 
       // ถ้าเป็นการกดโหลดครั้งแรก หรือกดปุ่มรีเฟรชเอง ให้แสดงตัวหมุนโหลดข้อมูล
       if (!isSilent || !rawData || rawData.length === 0) {
-        document.querySelector('#detail-table tbody').innerHTML = '<tr><td colspan="8" class="text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div>กำลังซิงค์ข้อมูลระบบ (Synchronizing System Data)...</td></tr>';
+        document.querySelector('#detail-table tbody').innerHTML = '<tr><td colspan="9" class="text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div>กำลังซิงค์ข้อมูลระบบ (Synchronizing System Data)...</td></tr>';
         document.querySelector('#summary-table tbody').innerHTML = '<tr><td colspan="7" class="text-center py-3 text-light">กำลังประมวลผลสรุปยอดการใช้งาน...</td></tr>';
         document.getElementById('latest-cards-container').innerHTML = '<div class="col-12 text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังซิงค์สถานะสถานีตาชั่ง (Station Mimic)...</div>';
         var chemUsageRow = document.getElementById('chemical-usage-cards-row');
@@ -1541,7 +1970,7 @@
       }
 
       if (!rows || rows.length <= 1) {
-        document.querySelector('#detail-table tbody').innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">ยังไม่มีข้อมูลในชีต</td></tr>';
+        document.querySelector('#detail-table tbody').innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">ยังไม่มีข้อมูลในชีต</td></tr>';
         document.querySelector('#summary-table tbody').innerHTML = '<tr><td colspan="7" class="text-center py-3 text-muted">ยังไม่มีข้อมูล</td></tr>';
         document.getElementById('latest-cards-container').innerHTML = '<div class="col-12 text-center py-3 text-muted">ยังไม่มีข้อมูลการชั่งในระบบ</div>';
         return;
@@ -1557,6 +1986,9 @@
 
       // คำนวณสรุปข้อมูล, กราฟ, และตาราง
       filterData();
+
+      // ตรวจสอบและสั่งพิมพ์สติ๊กเกอร์อัตโนมัติหากมีข้อมูลใหม่ (Auto-Print Zebra ZD421)
+      checkAutoPrint(rawData);
     }
 
     function onError(error) {
@@ -1564,7 +1996,7 @@
       document.getElementById('comm-status').className = 'text-danger';
       var msg = error && error.message ? error.message : String(error);
       document.querySelector('#detail-table tbody').innerHTML = 
-        '<tr><td colspan="8" class="text-center py-4 text-danger">' +
+        '<tr><td colspan="9" class="text-center py-4 text-danger">' +
         'เกิดข้อผิดพลาดในการดึงข้อมูล: ' + msg + '<br>' +
         '<small class="text-light">กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตหรือสถานะเซิร์ฟเวอร์ระบบ</small>' +
         '</td></tr>';
@@ -2153,7 +2585,7 @@
       var paginationWrapper = document.getElementById('pagination-wrapper');
 
       if (totalRecords === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">ไม่พบข้อมูลตามช่วงเวลาที่เลือก</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="text-center py-4 text-muted">ไม่พบข้อมูลตามช่วงเวลาที่เลือก</td></tr>';
         if (paginationWrapper) paginationWrapper.style.setProperty('display', 'none', 'important');
         return;
       }
@@ -2196,6 +2628,7 @@
 
         var modeBadgeClass = scaleInfo.mode === 'Mode Weight' ? 'bg-success text-white' : 'bg-primary text-white';
         var actualDisplay = getEffectiveActualDisplay(r[3], r[2]);
+        var rowRealIdx = startIndex + index;
 
         html += '<tr>';
         html += '<td class="col-idx">' + rowNum + '</td>';
@@ -2206,6 +2639,7 @@
         html += '<td class="text-num fw-bold" style="color: #00e676 !important;">' + actualDisplay + '</td>';
         html += '<td class="text-num fw-bold">' + diffHtml + '</td>';
         html += '<td>' + statusBadge + '</td>';
+        html += '<td><button class="btn btn-sm btn-outline-warning py-0 px-2 fw-semibold" onclick="printRowLabelByIndex(' + rowRealIdx + ')" title="พิมพ์ฉลากสติ๊กเกอร์ Zebra ZD421 (7cm × 4cm)"><i class="bi bi-printer-fill me-1"></i>พิมพ์</button></td>';
         html += '</tr>';
       });
 
