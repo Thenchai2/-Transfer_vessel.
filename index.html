@@ -1293,6 +1293,80 @@
     </div>
   </div>
 
+  <!-- Modal ป๊อปอัปตรวจสอบข้อมูลสติ๊กเกอร์เมื่อสแกน QR Code (Mobile & Desktop) -->
+  <div class="modal fade" id="verifyModal" tabindex="-1" aria-labelledby="verifyModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content bg-dark text-white border border-info shadow-lg" style="border-radius: 14px; overflow: hidden;">
+        <div class="modal-header bg-black bg-opacity-75 border-secondary py-3">
+          <div class="d-flex align-items-center gap-2">
+            <span class="fs-4 text-success"><i class="bi bi-shield-check"></i></span>
+            <div>
+              <h6 class="modal-title fw-bold text-white mb-0" id="verifyModalLabel">
+                ยืนยันข้อมูลการแบ่งถ่ายสารเคมี
+              </h6>
+              <small class="text-info" style="font-size: 11px; letter-spacing: 0.5px;">PP FACTORY - CHEMICAL DOSING VERIFIED</small>
+            </div>
+          </div>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body p-4 text-center">
+          
+          <!-- ตราสัญลักษณ์ / สถานะการตรวจสอบ -->
+          <div class="mb-3">
+            <span class="badge bg-success-subtle text-success border border-success px-3 py-2 fs-6 rounded-pill shadow-sm" id="v-status-badge">
+              <i class="bi bi-check-circle-fill me-1"></i> อยู่ในเกณฑ์ยอมรับ (Pass)
+            </span>
+          </div>
+
+          <!-- ชื่อสารเคมี -->
+          <div class="p-3 bg-black bg-opacity-50 rounded-3 border border-secondary mb-3 shadow-sm">
+            <div class="small text-light text-uppercase mb-1" style="font-size: 11.5px; letter-spacing: 0.5px;">ชื่อสารเคมี (Chemical)</div>
+            <h4 class="fw-bold text-warning mb-2" id="v-chemical">CAUSTIC SODA 50%</h4>
+            <span class="badge bg-primary px-3 py-1 text-uppercase fw-semibold" id="v-mode">Mode Weight</span>
+          </div>
+
+          <!-- การ์ดเปรียบเทียบ Target vs Actual -->
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <div class="p-3 bg-secondary bg-opacity-25 rounded-3 border border-secondary">
+                <small class="text-light d-block mb-1">Target (เป้าหมาย)</small>
+                <div class="fs-3 fw-bold text-warning" id="v-target">200.00</div>
+                <small class="text-light">กิโลกรัม (kg)</small>
+              </div>
+            </div>
+            <div class="col-6">
+              <div class="p-3 bg-secondary bg-opacity-25 rounded-3 border border-secondary">
+                <small class="text-light d-block mb-1">Actual (จ่ายจริง)</small>
+                <div class="fs-3 fw-bold text-success" id="v-actual">200.30</div>
+                <small class="text-light">กิโลกรัม (kg)</small>
+              </div>
+            </div>
+          </div>
+
+          <!-- ผลต่าง (Diff) -->
+          <div class="p-2 bg-dark rounded-3 border border-secondary mb-3 d-flex justify-content-between align-items-center px-3">
+            <span class="small text-light fw-semibold">ผลต่างน้ำหนัก (Diff):</span>
+            <span class="fw-bold text-info fs-6" id="v-diff">+0.30 kg (+0.15%)</span>
+          </div>
+
+          <!-- วันที่และเวลา -->
+          <div class="small text-light mb-1">
+            <i class="bi bi-clock-history me-1 text-info"></i>วัน-เวลาที่แบ่งถ่าย: <b class="text-white" id="v-datetime">26/11/2026 10:14:34</b>
+          </div>
+          <div class="small text-muted" style="font-size: 11.5px;">
+            <i class="bi bi-building me-1"></i>สถานที่: PP FACTORY TANK FARM
+          </div>
+
+        </div>
+        <div class="modal-footer border-secondary justify-content-center bg-black bg-opacity-50">
+          <button type="button" class="btn btn-sm btn-outline-light px-4 fw-semibold" data-bs-dismiss="modal">
+            <i class="bi bi-speedometer2 me-1"></i> เข้าสู่หน้าแดชบอร์ดหลัก
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- โหลด Bootstrap 5 JS -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
@@ -1385,6 +1459,7 @@
     window.onload = function() {
       startLiveClock();
       initAutoPrintUI();
+      checkUrlVerificationPopup();
       loadData(false);
       
       // ตั้งค่าตัวกรองประวัติแท็งก์เริ่มต้นเป็น 7 วันล่าสุด และโหลดข้อมูลแท็งก์ล่วงหน้า
@@ -1463,9 +1538,75 @@
       modal.show();
     }
 
+    // ฟังก์ชันตรวจสอบ URL Parameters เพื่อแสดงป๊อปอัปผลการสแกน QR Code (Mobile/Desktop)
+    function checkUrlVerificationPopup() {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('v') === '1') {
+          var chem = params.get('c') || 'CHEMICAL';
+          var mode = params.get('m') || 'Mode Weight';
+          var target = params.get('t') || '-';
+          var actual = params.get('a') || '-';
+          var diff = params.get('d') || '-';
+          var dt = params.get('dt') || '-';
+          var st = params.get('st') || 'pass';
+
+          var chemEl = document.getElementById('v-chemical');
+          var modeEl = document.getElementById('v-mode');
+          var targetEl = document.getElementById('v-target');
+          var actualEl = document.getElementById('v-actual');
+          var diffEl = document.getElementById('v-diff');
+          var dtEl = document.getElementById('v-datetime');
+          var badgeEl = document.getElementById('v-status-badge');
+
+          if (chemEl) chemEl.innerText = chem;
+          if (modeEl) modeEl.innerText = mode;
+          if (targetEl) targetEl.innerText = target;
+          if (actualEl) actualEl.innerText = actual;
+          if (diffEl) diffEl.innerText = diff;
+          if (dtEl) dtEl.innerText = dt;
+
+          if (badgeEl) {
+            if (st === 'pass') {
+              badgeEl.className = 'badge bg-success-subtle text-success border border-success px-3 py-2 fs-6 rounded-pill shadow-sm';
+              badgeEl.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> อยู่ในเกณฑ์ยอมรับ (Pass)';
+            } else {
+              badgeEl.className = 'badge bg-danger-subtle text-danger border border-danger px-3 py-2 fs-6 rounded-pill shadow-sm';
+              badgeEl.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i> เกินเกณฑ์ที่ยอมรับ (Alert)';
+            }
+          }
+
+          var modalEl = document.getElementById('verifyModal');
+          if (modalEl) {
+            var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+          }
+        }
+      } catch (err) {
+        console.warn('QR Verification popup init error:', err);
+      }
+    }
+
     // ฟังก์ชันจัดรูปแบบข้อมูลสำหรับฉลาก
     function extractLabelData(row) {
+      var targetUrlBase = 'https://transfervessel.vercel.app/';
+      try {
+        var origin = window.location.origin;
+        if (origin && origin.indexOf('http') === 0 && origin.indexOf('localhost') === -1 && origin.indexOf('127.0.0.1') === -1) {
+          targetUrlBase = origin + window.location.pathname;
+        }
+      } catch (e) {}
+
       if (!row || !Array.isArray(row)) {
+        var sampleUrl = targetUrlBase + (targetUrlBase.indexOf('?') > -1 ? '&' : '?') +
+          'v=1' +
+          '&c=' + encodeURIComponent('CAUSTIC SODA 50%') +
+          '&m=' + encodeURIComponent('Mode Weight') +
+          '&t=200.00' +
+          '&a=200.30' +
+          '&d=' + encodeURIComponent('+0.30 kg (+0.15%)') +
+          '&dt=' + encodeURIComponent('26/11/2026 10:14:34') +
+          '&st=pass';
         return {
           chemical: 'CAUSTIC SODA 50%',
           mode: 'MODE WEIGHT',
@@ -1474,7 +1615,7 @@
           diffStr: '+0.30 kg (+0.15%)',
           isNormal: true,
           dateStr: '26/11/2026 10:14:34',
-          qrPayload: 'PP_FACTORY|CAUSTIC SODA 50%|200.00|200.30|26/11/2026 10:14:34'
+          qrPayload: sampleUrl
         };
       }
 
@@ -1497,7 +1638,17 @@
         diffStr = sign + diff.toFixed(2) + ' kg (' + (diff > 0 ? '+' : '') + diffPct.toFixed(1) + '%)';
       }
 
-      var qrPayload = 'PP_CHEM|' + scaleInfo.chemical + '|' + scaleInfo.mode + '|T:' + targetStr + '|A:' + actualStr + '|' + dateStr;
+      // สร้างลิงก์ QR Code ที่เมื่อสแกนด้วยกล้องมือถือ จะเปิดหน้าเว็บพร้อมเด้งป๊อปอัปตรวจสอบข้อมูลทันที
+      var sep = targetUrlBase.indexOf('?') > -1 ? '&' : '?';
+      var qrPayload = targetUrlBase + sep +
+        'v=1' +
+        '&c=' + encodeURIComponent(scaleInfo.chemical || 'CHEMICAL') +
+        '&m=' + encodeURIComponent(scaleInfo.mode || 'Mode Weight') +
+        '&t=' + encodeURIComponent(targetStr) +
+        '&a=' + encodeURIComponent(actualStr) +
+        '&d=' + encodeURIComponent(diffStr) +
+        '&dt=' + encodeURIComponent(dateStr) +
+        '&st=' + (isNormal ? 'pass' : 'alert');
 
       return {
         chemical: scaleInfo.chemical || 'CHEMICAL',
