@@ -1096,7 +1096,8 @@
     let barChartInstance = null;
     let trendChartInstance = null;
     let autoRefreshTimer = null;
-    let currentTolerancePercent = 1.0; // ค่าเริ่มต้นเกณฑ์ % ผลต่าง
+    var savedTol = parseFloat(localStorage.getItem('diffTolerancePercent'));
+    let currentTolerancePercent = (!isNaN(savedTol) && savedTol > 0) ? savedTol : 1.0; // ค่าเริ่มต้นเกณฑ์ % ผลต่าง
 
     // ========================================================
     // การตั้งค่า InfluxDB Cloud และสเปกแท็งก์สารเคมี (Tank Farm)
@@ -1209,8 +1210,48 @@
       modal.show();
     }
 
-    // บันทึกการตั้งค่า % ผลต่างลง Google Sheet และซิงค์ทุกคน
-    function saveTolerance() {
+    // ฟังก์ชันเขียนข้อมูล Point เข้า InfluxDB
+    async function writeInfluxPoint(lineProtocol) {
+      var writeUrl = INFLUX_CONFIG.url + '/api/v2/write?org=' + encodeURIComponent(INFLUX_CONFIG.org) +
+                     '&bucket=' + encodeURIComponent(INFLUX_CONFIG.bucket) + '&precision=s';
+      var res = await fetch(writeUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Token ' + INFLUX_CONFIG.token,
+          'Content-Type': 'text/plain; charset=utf-8'
+        },
+        body: lineProtocol
+      });
+      if (!res.ok && res.status !== 204) {
+        throw new Error('InfluxDB HTTP ' + res.status);
+      }
+      return true;
+    }
+
+    // ฟังก์ชันแยกวิเคราะห์ค่า Tolerance จาก CSV ของ InfluxDB
+    function parseToleranceCsv(csv) {
+      if (!csv || !csv.trim()) return null;
+      var lines = csv.trim().split('\n');
+      var header = null;
+      for (var i = 0; i < lines.length; i++) {
+        var l = lines[i].trim();
+        if (!l || l.charAt(0) === '#') continue;
+        var parts = parseCSVLine(l);
+        if (!header) {
+          header = parts;
+          continue;
+        }
+        var valIdx = header.indexOf('_value');
+        if (valIdx > -1 && parts[valIdx] !== undefined) {
+          var n = parseFloat(parts[valIdx]);
+          if (!isNaN(n) && n > 0) return n;
+        }
+      }
+      return null;
+    }
+
+    // บันทึกการตั้งค่า % ผลต่างลง InfluxDB และ Google Sheet ซิงค์ทุกเครื่องทันที
+    async function saveTolerance() {
       var val = parseFloat(document.getElementById('input-tolerance').value);
       if (isNaN(val) || val <= 0) {
         alert('กรุณาระบุตัวเลขเกณฑ์ % ที่มากกว่า 0');
@@ -1219,69 +1260,37 @@
 
       var btn = document.getElementById('btn-save-tolerance');
       btn.disabled = true;
-      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> กำลังบันทึก...';
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> กำลังบันทึกและซิงค์...';
 
-      var url = getWebAppUrl();
-      var sep = url.indexOf('?') > -1 ? '&' : '?';
-      var saveUrl = url + sep + 'action=setTolerance&val=' + encodeURIComponent(val);
-
-      fetch(saveUrl)
-        .then(function(res) {
-          if (!res.ok) throw new Error('HTTP Status ' + res.status);
-          return res.json();
-        })
-        .then(function(res) {
-          finishSave(val);
-        })
-        .catch(function(err) {
-          saveToleranceJsonp(saveUrl, val, finishSave, function(e) {
-            alert('เกิดข้อผิดพลาดในการบันทึก: ' + e);
-            btn.disabled = false;
-            btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> บันทึกและซิงค์ทุกคน';
-          });
-        });
-
-      function finishSave(newVal) {
-        currentTolerancePercent = newVal;
-        updateToleranceBadge(newVal);
-        var modalEl = document.getElementById('toleranceModal');
-        var modal = bootstrap.Modal.getInstance(modalEl);
-        if (modal) modal.hide();
-        btn.disabled = false;
-        btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> บันทึกและซิงค์ทุกคน';
-        filterData(); // คำนวณสีและสถานะตารางใหม่ทันทีด้วยเกณฑ์ใหม่
-      }
-    }
-
-    function saveToleranceJsonp(url, val, onSuccessCb, onErrorCb) {
-      var callbackName = 'gasToleranceCallback_' + Math.round(100000 * Math.random());
-      var script = document.createElement('script');
-      var sep = url.indexOf('?') > -1 ? '&' : '?';
-      script.src = url + sep + 'callback=' + callbackName;
-
-      var timer = setTimeout(function() {
-        cleanup();
-        onErrorCb('หมดเวลาเชื่อมต่อ (Timeout)');
-      }, 10000);
-
-      window[callbackName] = function(res) {
-        clearTimeout(timer);
-        cleanup();
-        onSuccessCb(val);
-      };
-
-      function cleanup() {
-        if (script.parentNode) script.parentNode.removeChild(script);
-        delete window[callbackName];
+      // 1. บันทึกลง InfluxDB ทันที (เสี้ยววินาที ทุกเครื่องจะซิงค์ตรงกัน)
+      try {
+        var epochSec = Math.floor(Date.now() / 1000);
+        var line = 'system_config,setting=tolerance tolerance_percent=' + val.toFixed(1) + ' ' + epochSec;
+        await writeInfluxPoint(line);
+      } catch (influxErr) {
+        console.warn('InfluxDB save tolerance error:', influxErr);
       }
 
-      script.onerror = function() {
-        clearTimeout(timer);
-        cleanup();
-        onErrorCb('Network Script Error');
-      };
+      // 2. สำรองลง localStorage ประจำเครื่อง
+      localStorage.setItem('diffTolerancePercent', String(val));
 
-      document.body.appendChild(script);
+      // 3. ส่งไปบันทึกลง Google Sheet แบบเบื้องหลัง (Background Backup)
+      try {
+        var url = getWebAppUrl();
+        var sep = url.indexOf('?') > -1 ? '&' : '?';
+        var saveUrl = url + sep + 'action=setTolerance&val=' + encodeURIComponent(val);
+        fetch(saveUrl).catch(function() {});
+      } catch (e) {}
+
+      // 4. อัปเดตหน้าจอทันที
+      currentTolerancePercent = val;
+      updateToleranceBadge(val);
+      var modalEl = document.getElementById('toleranceModal');
+      var modal = bootstrap.Modal.getInstance(modalEl);
+      if (modal) modal.hide();
+      btn.disabled = false;
+      btn.innerHTML = '<i class="bi bi-check-circle me-1"></i> บันทึกและซิงค์ทุกคน';
+      filterData();
     }
 
     // ระบบรีเฟรชข้อมูลอัตโนมัติ (SCADA Auto-Sync)
@@ -1431,14 +1440,30 @@
 
       // 1. ดึงจาก InfluxDB Cloud เป็นอันดับแรก (Fast Mode ~0.1-0.2 วินาที)
       try {
-        var flux = 'from(bucket: "' + INFLUX_CONFIG.bucket + '")\n' +
-                   '  |> range(start: 0)\n' +
-                   '  |> filter(fn: (r) => r._measurement == "scale_dosing")\n' +
-                   '  |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")\n' +
-                   '  |> group()\n' +
-                   '  |> sort(columns: ["_time"], desc: false)';
-        var csv = await queryInflux(flux);
-        var parsedRows = parseInfluxDosingCsv(csv);
+        var fluxData = 'from(bucket: "' + INFLUX_CONFIG.bucket + '")\n' +
+                       '  |> range(start: 0)\n' +
+                       '  |> filter(fn: (r) => r._measurement == "scale_dosing")\n' +
+                       '  |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")\n' +
+                       '  |> group()\n' +
+                       '  |> sort(columns: ["_time"], desc: false)';
+        var fluxTol = 'from(bucket: "' + INFLUX_CONFIG.bucket + '")\n' +
+                      '  |> range(start: 0)\n' +
+                      '  |> filter(fn: (r) => r._measurement == "system_config" and r._field == "tolerance_percent")\n' +
+                      '  |> last()';
+
+        var results = await Promise.all([queryInflux(fluxData), queryInflux(fluxTol)]);
+        var csvData = results[0];
+        var csvTol = results[1];
+
+        // อัปเดตเกณฑ์ % ผลต่างล่าสุดที่ซิงค์จาก InfluxDB ทันที
+        var tolVal = parseToleranceCsv(csvTol);
+        if (tolVal !== null && tolVal > 0) {
+          currentTolerancePercent = tolVal;
+          updateToleranceBadge(tolVal);
+          localStorage.setItem('diffTolerancePercent', String(tolVal));
+        }
+
+        var parsedRows = parseInfluxDosingCsv(csvData);
         if (parsedRows && parsedRows.length > 1) {
           updateDataSourceBadge('influx');
           onSuccess({ rows: parsedRows, tolerancePercent: currentTolerancePercent });
