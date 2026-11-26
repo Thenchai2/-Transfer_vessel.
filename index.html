@@ -2078,19 +2078,28 @@
       return rows;
     }
 
+    var isDosingDataLoading = false;
+
     // ฟังก์ชันดึงข้อมูลจาก API ระบบ (ลอง InfluxDB ก่อน หากไม่มีหรือมีปัญหาจะสลับไป Google Sheets ทันที)
     async function loadData(isSilent) {
-      document.getElementById('comm-status').innerText = 'กำลังซิงค์...';
-      document.getElementById('comm-status').className = 'text-warning';
-      updateDataSourceBadge('loading');
+      if (isDosingDataLoading) return; // ป้องกันการยิงคำขอซ้อนทับกันเมื่อตั้งรีเฟรช 1 วินาที
+      isDosingDataLoading = true;
 
-      // ถ้าเป็นการกดโหลดครั้งแรก หรือกดปุ่มรีเฟรชเอง ให้แสดงตัวหมุนโหลดข้อมูล
-      if (!isSilent || !rawData || rawData.length === 0) {
-        document.querySelector('#detail-table tbody').innerHTML = '<tr><td colspan="9" class="text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div>กำลังซิงค์ข้อมูลระบบ (Synchronizing System Data)...</td></tr>';
-        document.querySelector('#summary-table tbody').innerHTML = '<tr><td colspan="7" class="text-center py-3 text-light">กำลังประมวลผลสรุปยอดการใช้งาน...</td></tr>';
-        document.getElementById('latest-cards-container').innerHTML = '<div class="col-12 text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังซิงค์สถานะสถานีตาชั่ง (Station Mimic)...</div>';
-        var chemUsageRow = document.getElementById('chemical-usage-cards-row');
-        if (chemUsageRow) chemUsageRow.innerHTML = '<div class="col-12 text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังประมวลผลข้อมูลยอดการใช้งานเคมี...</div>';
+      // แสดงสถานะ "กำลังซิงค์..." และตัวหมุน เฉพาะเมื่อผู้ใช้กดรีเฟรชเอง หรือเปิดเว็บครั้งแรกเท่านั้น
+      // ถ้าเป็นการออโตรีเฟรชเงียบ (isSilent) จะไม่สลับสถานะ เพื่อไม่ให้ Badge ขึ้น "ซิงค์ข้อมูล..." ค้างหรือกระพริบ
+      if (!isSilent) {
+        document.getElementById('comm-status').innerText = 'กำลังซิงค์...';
+        document.getElementById('comm-status').className = 'text-warning';
+        updateDataSourceBadge('loading');
+
+        // ถ้าเป็นการกดโหลดครั้งแรก หรือกดปุ่มรีเฟรชเอง ให้แสดงตัวหมุนโหลดข้อมูล
+        if (!rawData || rawData.length === 0) {
+          document.querySelector('#detail-table tbody').innerHTML = '<tr><td colspan="9" class="text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div>กำลังซิงค์ข้อมูลระบบ (Synchronizing System Data)...</td></tr>';
+          document.querySelector('#summary-table tbody').innerHTML = '<tr><td colspan="7" class="text-center py-3 text-light">กำลังประมวลผลสรุปยอดการใช้งาน...</td></tr>';
+          document.getElementById('latest-cards-container').innerHTML = '<div class="col-12 text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังซิงค์สถานะสถานีตาชั่ง (Station Mimic)...</div>';
+          var chemUsageRow = document.getElementById('chemical-usage-cards-row');
+          if (chemUsageRow) chemUsageRow.innerHTML = '<div class="col-12 text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังประมวลผลข้อมูลยอดการใช้งานเคมี...</div>';
+        }
       }
 
       // 1. ดึงจาก InfluxDB Cloud เป็นอันดับแรก (Fast Mode ~0.1-0.2 วินาที)
@@ -2183,6 +2192,7 @@
     var lastDosingDataSignature = "";
 
     function onSuccess(data, isSilent) {
+      isDosingDataLoading = false;
       document.getElementById('comm-status').innerText = 'ออนไลน์';
       document.getElementById('comm-status').className = 'text-success';
       document.getElementById('last-update-time').innerText = 'อัปเดต: ' + new Date().toLocaleTimeString('th-TH');
@@ -2233,6 +2243,7 @@
     }
 
     function onError(error) {
+      isDosingDataLoading = false;
       document.getElementById('comm-status').innerText = 'ออฟไลน์';
       document.getElementById('comm-status').className = 'text-danger';
       var msg = error && error.message ? error.message : String(error);
