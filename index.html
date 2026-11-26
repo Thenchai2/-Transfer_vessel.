@@ -522,6 +522,9 @@
           <div class="px-3 py-1 rounded bg-dark border border-secondary text-success small fw-bold d-flex align-items-center">
             <span class="status-led"></span> <span id="comm-status">ออนไลน์</span>
           </div>
+          <div class="px-2 py-1 rounded bg-dark border border-secondary small fw-semibold" id="data-source-badge" title="แหล่งข้อมูล: กำลังตรวจสอบ">
+            <i class="bi bi-lightning-charge-fill text-warning me-1"></i><span id="data-source-label" class="text-light">ซิงค์ข้อมูล...</span>
+          </div>
           <div class="px-3 py-1 rounded bg-dark border border-secondary text-info small" id="live-clock">
             00:00:00
           </div>
@@ -1309,10 +1312,113 @@
       setInterval(update, 1000);
     }
 
-    // ฟังก์ชันดึงข้อมูลจาก API ระบบ
-    function loadData(isSilent) {
+    function updateDataSourceBadge(type) {
+      var badge = document.getElementById('data-source-badge');
+      var label = document.getElementById('data-source-label');
+      if (!badge || !label) return;
+      if (type === 'influx') {
+        badge.className = 'px-2 py-1 rounded bg-dark border border-success small fw-semibold';
+        badge.title = 'เชื่อมต่อตรงกับ InfluxDB Cloud (Fast Mode: ความเร็วสูง)';
+        label.className = 'text-success';
+        label.innerHTML = '<i class="bi bi-lightning-charge-fill me-1"></i>InfluxDB Fast';
+      } else if (type === 'sheets') {
+        badge.className = 'px-2 py-1 rounded bg-dark border border-info small fw-semibold';
+        badge.title = 'เชื่อมต่อกับ Google Sheets Web App (โหมดสำรอง)';
+        label.className = 'text-info';
+        label.innerHTML = '<i class="bi bi-file-earmark-spreadsheet me-1"></i>Google Sheets';
+      } else {
+        badge.className = 'px-2 py-1 rounded bg-dark border border-secondary small fw-semibold';
+        label.className = 'text-light';
+        label.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>ซิงค์ข้อมูล...';
+      }
+    }
+
+    // ฟังก์ชันแยกวิเคราะห์แถว CSV อย่างแม่นยำ (รองรับเครื่องหมายคำพูด)
+    function parseCSVLine(line) {
+      var values = [];
+      var cur = '';
+      var inQuotes = false;
+      for (var i = 0; i < line.length; i++) {
+        var c = line[i];
+        if (c === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            cur += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (c === ',' && !inQuotes) {
+          values.push(cur);
+          cur = '';
+        } else {
+          cur += c;
+        }
+      }
+      values.push(cur);
+      return values;
+    }
+
+    // ฟังก์ชันแยกวิเคราะห์ CSV ผลลัพธ์จาก InfluxDB สำหรับบันทึกการชั่งเคมี
+    function parseInfluxDosingCsv(csvText) {
+      if (!csvText || !csvText.trim()) return [];
+      var lines = csvText.split('\n');
+      var header = null;
+      var rows = [
+        ["Timestamp", "Target weight", "Resulting weight", "Actual weight", "Scale Name"]
+      ];
+
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i].trim();
+        if (!line || line.charAt(0) === '#') continue;
+
+        var cols = parseCSVLine(line);
+        if (!header) {
+          header = cols;
+          continue;
+        }
+
+        var rowObj = {};
+        for (var c = 0; c < header.length; c++) {
+          rowObj[header[c]] = cols[c] !== undefined ? cols[c] : '';
+        }
+
+        var time = rowObj['_time'];
+        var target = rowObj['target'];
+        var resulting = rowObj['resulting'];
+        var actual = rowObj['actual'];
+        var scaleName = rowObj['scale_name'];
+
+        if (time && scaleName) {
+          rows.push([
+            time,
+            target !== undefined && target !== '' ? target : 0,
+            resulting !== undefined && resulting !== '' ? resulting : 0,
+            actual !== undefined && actual !== '' ? actual : 0,
+            scaleName
+          ]);
+        }
+      }
+
+      // จัดเรียงจากเก่าไปใหม่ตามเวลา
+      if (rows.length > 2) {
+        var headerRow = rows[0];
+        var dataRows = rows.slice(1);
+        dataRows.sort(function(a, b) {
+          var ta = new Date(a[0]).getTime() || 0;
+          var tb = new Date(b[0]).getTime() || 0;
+          return ta - tb;
+        });
+        return [headerRow].concat(dataRows);
+      }
+
+      return rows;
+    }
+
+    // ฟังก์ชันดึงข้อมูลจาก API ระบบ (ลอง InfluxDB ก่อน หากไม่มีหรือมีปัญหาจะสลับไป Google Sheets ทันที)
+    async function loadData(isSilent) {
       document.getElementById('comm-status').innerText = 'กำลังซิงค์...';
       document.getElementById('comm-status').className = 'text-warning';
+      updateDataSourceBadge('loading');
 
       // ถ้าเป็นการกดโหลดครั้งแรก หรือกดปุ่มรีเฟรชเอง ให้แสดงตัวหมุนโหลดข้อมูล
       if (!isSilent || !rawData || rawData.length === 0) {
@@ -1323,8 +1429,32 @@
         if (chemUsageRow) chemUsageRow.innerHTML = '<div class="col-12 text-center py-4 text-light"><div class="spinner-border spinner-border-sm text-primary me-2"></div> กำลังประมวลผลข้อมูลยอดการใช้งานเคมี...</div>';
       }
 
-      var url = getWebAppUrl();
+      // 1. ดึงจาก InfluxDB Cloud เป็นอันดับแรก (Fast Mode ~0.1-0.2 วินาที)
+      try {
+        var flux = 'from(bucket: "' + INFLUX_CONFIG.bucket + '")\n' +
+                   '  |> range(start: 0)\n' +
+                   '  |> filter(fn: (r) => r._measurement == "scale_dosing")\n' +
+                   '  |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")\n' +
+                   '  |> group()\n' +
+                   '  |> sort(columns: ["_time"], desc: false)';
+        var csv = await queryInflux(flux);
+        var parsedRows = parseInfluxDosingCsv(csv);
+        if (parsedRows && parsedRows.length > 1) {
+          updateDataSourceBadge('influx');
+          onSuccess({ rows: parsedRows, tolerancePercent: currentTolerancePercent });
+          return;
+        }
+      } catch (influxErr) {
+        console.warn('InfluxDB fast query failed, switching to Google Sheets:', influxErr);
+      }
 
+      // 2. หาก InfluxDB ไม่พร้อม ให้ดึงจาก Google Sheets (Fallback)
+      updateDataSourceBadge('sheets');
+      loadDataFromGoogleSheets();
+    }
+
+    function loadDataFromGoogleSheets() {
+      var url = getWebAppUrl();
       fetch(url)
         .then(function(res) {
           if (!res.ok) throw new Error('HTTP Status ' + res.status);

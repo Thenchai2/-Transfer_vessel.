@@ -52,29 +52,42 @@ function doPost(e) {
 
   // --- บันทึกข้อมูลลงชีตเดียว และเพิ่มชื่อตาชั่งต่อท้าย ---
 
+  // รายการบันทึก Line Protocol ส่งไปยัง InfluxDB ควบคู่กัน (Dual-Write)
+  var influxLines = [];
+
   // 1. ข้อมูล "Mode Timer  LS9"
   if (d5032 !== undefined || data.D102 !== undefined || d5040 !== undefined) {
     mainSheet.appendRow([timestamp, d5032, d102, d5040, "Mode Timer  LS9"]);
+    influxLines.push(formatLineProtocol("Mode Timer  LS9", d5032, data.D102, d5040, timestamp));
   }
 
   // 2. ข้อมูล "Mode Timer  UD1"
   if (d5048 !== undefined || data.D118 !== undefined || d5052 !== undefined) {
     mainSheet.appendRow([timestamp, d5048, d118, d5052, "Mode Timer  UD1"]); 
+    influxLines.push(formatLineProtocol("Mode Timer  UD1", d5048, data.D118, d5052, timestamp));
   }
 
   // 3. ข้อมูล "Mode Timer  LAS"
   if (d5060 !== undefined || data.D134 !== undefined || d5064 !== undefined) {
     mainSheet.appendRow([timestamp, d5060, d134, d5064, "Mode Timer  LAS"]); 
+    influxLines.push(formatLineProtocol("Mode Timer  LAS", d5060, data.D134, d5064, timestamp));
   }
 
   // 4. ข้อมูล "Mode Timer  CAUSTIC SODA 50%" 
   if (d5072 !== undefined || data.D150 !== undefined || d5076 !== undefined) {
     mainSheet.appendRow([timestamp, d5072, d150, d5076, "Mode Timer  CAUSTIC SODA 50%"]); 
+    influxLines.push(formatLineProtocol("Mode Timer  CAUSTIC SODA 50%", d5072, data.D150, d5076, timestamp));
   }
 
   // 5. ข้อมูล "Mode Weight  CAUSTIC SODA 50%"
   if (d5108 !== undefined || data.D178 !== undefined || d5076_weight !== undefined) {
     mainSheet.appendRow([timestamp, d5108, d178, d5076_weight, "Mode Weight  CAUSTIC SODA 50%"]); 
+    influxLines.push(formatLineProtocol("Mode Weight  CAUSTIC SODA 50%", d5108, data.D178, d5076_weight, timestamp));
+  }
+
+  // ส่งบันทึกเข้า InfluxDB Cloud ทันที (Dual-Write)
+  if (influxLines.length > 0) {
+    sendBatchToInflux(influxLines);
   }
 
   return ContentService.createTextOutput(JSON.stringify({
@@ -219,4 +232,123 @@ function getDashboardData() {
     rows: formattedData,
     tolerancePercent: tolerance
   };
+}
+
+// =========================================================================
+// --- การตั้งค่า InfluxDB Cloud และฟังก์ชันบันทึกข้อมูลคู่ขนาน (Dual-Write) ---
+// =========================================================================
+var INFLUX_CONFIG = {
+  url: "https://influxdb-2-jxoj.srv1370657.hstgr.cloud",
+  org: "PP_Factory",
+  bucket: "tank fram",
+  token: "2mhFfgP3IM3D3s0kptYjHU8JJiC_nKhgfEkxSeLNh89LrKKQCKjcTmqnN3iF487SYMz4lAWI-MAJzay_Gv8m_A=="
+};
+
+function formatLineProtocol(scaleName, targetVal, resultingVal, actualVal, dateObj) {
+  function cleanNum(val) {
+    if (val === undefined || val === null || val === '') return NaN;
+    var s = String(val).replace(/^['"\s]+/, '').replace(/,/g, '').trim();
+    var n = parseFloat(s);
+    return isNaN(n) ? NaN : n;
+  }
+
+  var chem = "Other";
+  if (scaleName.indexOf("CAUSTIC") > -1) chem = "CAUSTIC SODA 50%";
+  else if (scaleName.indexOf("LS9") > -1) chem = "LS9";
+  else if (scaleName.indexOf("UD1") > -1) chem = "UD1";
+  else if (scaleName.indexOf("LAS") > -1) chem = "LAS";
+
+  var mode = "Unknown";
+  if (scaleName.indexOf("Mode Weight") > -1) mode = "Mode Weight";
+  else if (scaleName.indexOf("Mode Timer") > -1) mode = "Mode Timer";
+
+  var t = cleanNum(targetVal);
+  var r = cleanNum(resultingVal);
+  var a = cleanNum(actualVal);
+
+  var effA = (!isNaN(a) && a !== 0) ? a : ((!isNaN(r) && r !== 0) ? r : 0);
+  var effT = !isNaN(t) ? t : 0;
+  var effR = !isNaN(r) ? r : 0;
+
+  function escapeTag(str) {
+    return String(str || '').replace(/,/g, '\\,').replace(/ /g, '\\ ').replace(/=/g, '\\=');
+  }
+
+  var tags = "chemical=" + escapeTag(chem) + ",mode=" + escapeTag(mode) + ",scale_name=" + escapeTag(scaleName);
+  var fields = "target=" + effT + ",resulting=" + effR + ",actual=" + effA;
+  var epochSec = Math.floor(dateObj.getTime() / 1000);
+
+  return "scale_dosing," + tags + " " + fields + " " + epochSec;
+}
+
+function sendBatchToInflux(lines) {
+  if (!lines || lines.length === 0) return;
+  try {
+    var writeUrl = INFLUX_CONFIG.url + "/api/v2/write?org=" + encodeURIComponent(INFLUX_CONFIG.org) + 
+                   "&bucket=" + encodeURIComponent(INFLUX_CONFIG.bucket) + "&precision=s";
+    var options = {
+      method: "post",
+      contentType: "text/plain; charset=utf-8",
+      headers: {
+        "Authorization": "Token " + INFLUX_CONFIG.token
+      },
+      payload: lines.join("\n"),
+      muteHttpExceptions: true
+    };
+    var response = UrlFetchApp.fetch(writeUrl, options);
+    var code = response.getResponseCode();
+    if (code !== 204) {
+      Logger.log("InfluxDB write error HTTP " + code + ": " + response.getContentText());
+    }
+  } catch (err) {
+    Logger.log("InfluxDB write exception: " + err.message);
+  }
+}
+
+// --- ฟังก์ชันย้าย/ซิงค์ข้อมูลประวัติเก่าทั้งหมดจาก Google Sheet เข้า InfluxDB ---
+function migrateSheetToInfluxDB() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName("รวมข้อมูลตาชั่ง");
+  if (!sheet) {
+    Logger.log("ไม่พบชีต 'รวมข้อมูลตาชั่ง'");
+    return;
+  }
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) {
+    Logger.log("ไม่มีข้อมูลในชีต");
+    return;
+  }
+
+  var lines = [];
+  var totalMigrated = 0;
+
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var dateVal = row[0];
+    var dateObj = (dateVal instanceof Date) ? dateVal : new Date(dateVal);
+    if (isNaN(dateObj.getTime())) continue;
+
+    var target = row[1];
+    var resulting = row[2];
+    var actual = row[3];
+    var scaleName = String(row[4] || '').trim();
+    if (!scaleName) continue;
+
+    var line = formatLineProtocol(scaleName, target, resulting, actual, dateObj);
+    lines.push(line);
+
+    if (lines.length >= 200) {
+      sendBatchToInflux(lines);
+      totalMigrated += lines.length;
+      lines = [];
+      Utilities.sleep(100);
+    }
+  }
+
+  if (lines.length > 0) {
+    sendBatchToInflux(lines);
+    totalMigrated += lines.length;
+  }
+
+  Logger.log("ย้ายข้อมูลเข้า InfluxDB สำเร็จทั้งหมด: " + totalMigrated + " รายการ");
 }
