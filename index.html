@@ -371,6 +371,40 @@
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), 0 0 15px rgba(59, 130, 246, 0.25);
       transform: translateY(-2px);
     }
+
+    /* แอนิเมชันกะพริบเตือนเมื่อระดับสารเคมีต่ำกว่าหรือเท่ากับ 20% (SCADA Low Level Alarm) */
+    @keyframes scadaTankAlarm {
+      0%, 100% {
+        border-color: #ef4444;
+        box-shadow: 0 0 15px rgba(239, 68, 68, 0.45), inset 0 0 15px rgba(239, 68, 68, 0.15);
+      }
+      50% {
+        border-color: #f87171;
+        box-shadow: 0 0 30px rgba(239, 68, 68, 0.9), inset 0 0 25px rgba(239, 68, 68, 0.35);
+      }
+    }
+
+    .tank-card.tank-card-alert {
+      border: 2px solid #ef4444 !important;
+      animation: scadaTankAlarm 1.2s infinite ease-in-out;
+      background: linear-gradient(180deg, rgba(80, 15, 15, 0.45) 0%, #162032 65%) !important;
+    }
+
+    @keyframes scadaBadgeBlink {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.65; transform: scale(1.04); }
+    }
+
+    .scada-blink-badge {
+      animation: scadaBadgeBlink 1s infinite ease-in-out;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.6);
+    }
+
+    .tank-pct-bubble.tank-pct-alert {
+      border: 2px solid #ef4444 !important;
+      color: #fca5a5 !important;
+      box-shadow: 0 0 15px rgba(239, 68, 68, 0.85) !important;
+    }
     .tank-card-header {
       display: flex;
       justify-content: space-between;
@@ -3327,13 +3361,19 @@
         totalCap += maxCap;
         if (temp > 0) temps.push(temp);
 
-        // คำนวณสถานะเตือนระดับสารเคมี
+        // คำนวณสถานะเตือนระดับสารเคมีตามเกณฑ์:
+        // 0% - 20%: ระดับต่ำ (การ์ดกะพริบเตือนสีแดง SCADA Alarm)
+        // มากกว่า 20% - 100%: ระดับปกติ
+        var isLow = (pct <= 20);
         var statusBadge = '';
-        if (pct < 15) {
+        var cardClass = 'tank-card';
+        var bubbleAlertClass = '';
+
+        if (isLow) {
           lowCount++;
-          statusBadge = '<span class="badge bg-danger text-white border border-danger"><i class="bi bi-exclamation-triangle-fill me-1"></i>ระดับต่ำ (เติมด่วน)</span>';
-        } else if (pct < 30) {
-          statusBadge = '<span class="badge bg-warning text-dark border border-warning"><i class="bi bi-info-circle me-1"></i>ระดับปานกลาง</span>';
+          cardClass += ' tank-card-alert';
+          bubbleAlertClass = ' tank-pct-alert';
+          statusBadge = '<span class="badge bg-danger text-white border border-danger scada-blink-badge"><i class="bi bi-exclamation-triangle-fill me-1"></i>ระดับต่ำ (เติมด่วน)</span>';
         } else {
           statusBadge = '<span class="badge bg-success-subtle text-success border border-success"><i class="bi bi-check-circle me-1"></i>ระดับปกติ</span>';
         }
@@ -3343,7 +3383,7 @@
 
         // 1. SCADA Tank Card HTML
         cardsHtml += '<div class="col">' +
-          '<div class="tank-card">' +
+          '<div class="' + cardClass + '">' +
             '<div class="tank-card-header">' +
               '<div>' +
                 '<div class="d-flex align-items-center gap-1">' +
@@ -3359,7 +3399,7 @@
                 '<div class="tank-liquid" style="height: ' + pct.toFixed(1) + '%; background: ' + spec.colorGrad + ';">' +
                   '<div class="tank-liquid-wave"></div>' +
                 '</div>' +
-                '<div class="tank-pct-bubble" style="border-color: ' + spec.color + ';">' +
+                '<div class="tank-pct-bubble' + bubbleAlertClass + '" style="border-color: ' + (isLow ? '#ef4444' : spec.color) + ';">' +
                   pct.toFixed(1) + '%' +
                 '</div>' +
               '</div>' +
@@ -4027,7 +4067,7 @@
         var item = latestTankData[k] || { volume: 0, temp: 0, time: '' };
         var pct = spec.maxCapacity > 0 ? (item.volume / spec.maxCapacity * 100) : 0;
         var ullage = Math.max(0, spec.maxCapacity - item.volume);
-        var status = pct < 15 ? 'ระดับต่ำ - ต้องเติมสาร' : (pct < 30 ? 'ระดับปานกลาง' : 'ระดับปกติ');
+        var status = pct <= 20 ? 'ระดับต่ำ - ต้องเติมสาร' : 'ระดับปกติ';
         var timeStr = item.time ? new Date(item.time).toLocaleString('th-TH') : '-';
 
         stockData.push([
